@@ -40,6 +40,24 @@ teams = {
     "Oakland Raiders": [37.804363, -122.271111, "OAK"]
 }
 
+superbowl_locations = {
+    '2011': 'DAL',
+    '2012': 'IND',
+    '2013': 'NO',
+    '2014': 'NYG',
+    '2015': 'ARI',
+    '2016': 'SF',
+    '2017': 'HOU',
+    '2018': 'MIN',
+    '2019': 'ATL',
+    '2020': 'MIA',
+    '2021': 'TB',
+    '2022': 'LAR',
+    '2023': 'ARI' ,
+    '2024': 'LV',
+    '2025': 'NO'
+}
+
 db.create_all()
 
 # make teams
@@ -85,14 +103,13 @@ def build_game(cols, playoff=False):
         home_team_points = winner_points
         away_team_points = loser_points
         neutral_game = True
-        # find the neutral location somehow. Likely from a stored
-        # json file or something
-        # TODO implement
 
     game = Game(home_team_id, away_team_id, day, date)
     game.home_points = home_team_points
     game.away_points = away_team_points
 
+    if neutral_game:
+        game.neutral_destination_id = superbowl_locations[date.split('-')[0]]
     if playoff:
         game.playoff = True
     return game
