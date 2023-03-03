@@ -66,7 +66,7 @@ def build_game(cols, playoff=False):
     if 'Washington' in winner:
         winner = 'Washington Commanders'
     elif 'Washington' in loser:
-        winner = 'Washington Commanders'
+        loser = 'Washington Commanders'
 
     if symbol == '':
         home_team_id = teams[winner][2]
@@ -100,6 +100,7 @@ def build_game(cols, playoff=False):
 # store season data
 cwd = os.getcwd()
 for file in os.listdir(cwd+'/data'):
+    
     with open(cwd+'/data/'+file, 'r') as f:
         start_year = file.split('_')[1].split('.')[0]
         last_digits = str(int(start_year[-2:])+1)
@@ -119,11 +120,10 @@ for file in os.listdir(cwd+'/data'):
             date = cols[2]
 
             if cols[0] != current_week:
-                date_year = date.split('-')[0]
                 # make a new week
                 if weeks:
                     weeks[-1].games = games
-                weeks.append(Week(date_year + '-' + cols[0]))
+                weeks.append(Week(date + '-' + cols[0]))
                 games = []
                 current_week = cols[0]
                 

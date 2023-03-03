@@ -52,7 +52,7 @@ class Week(db.Model):
     __tablename__ = 'weeks'
 
     # number is the assciated week number of the season
-    # example 2022-1 or 2022-WildCard
+    # example yyyy-mm-dd-1 or yyyy-mm-dd-WildCard
     number = db.Column(db.String, primary_key=True)
     season_id = db.Column(db.String(9), db.ForeignKey('seasons.year'))
     year = db.relationship('Season', back_populates='weeks')
