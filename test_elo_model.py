@@ -5,16 +5,16 @@ from numpy import log
 
 @pytest.fixture
 def team_objects():
-    kc = m.Team.query.get('KC')
+    kc = m.db.session.get(m.Team, 'KC')
     kc.elo = 1000
-    hou = m.Team.query.get('HOU')
+    hou = m.db.session.get(m.Team, 'HOU')
     hou.elo = 1250
-    sea = m.Team.query.get('SEA')
+    sea = m.db.session.get(m.Team, 'SEA')
     sea.elo = 1700
     sea.bye = True
-    nyj = m.Team.query.get('NYJ')
+    nyj = m.db.session.get(m.Team, 'NYJ')
     nyj.elo = 1550
-    nyg = m.Team.query.get('NYG')
+    nyg = m.db.session.get(m.Team, 'NYG')
     nyg.elo = 1660
     return [kc, hou, sea, nyj, nyg]
 
@@ -45,8 +45,8 @@ def test_get_distance(team_objects):
                               nyg.longitude)) == 0
     
 def calc_distance(game):
-    home_team = Team.query.get(game.home_team_id)
-    away_team = Team.query.get(game.away_team_id)
+    home_team = m.db.session.get(m.Team, game.home_team_id)
+    away_team = m.db.session.get(m.Team, game.away_team_id)
     return get_distance(home_team.latitude,
                         home_team.longitude,
                         away_team.latitude,
@@ -77,8 +77,8 @@ def test_elo_team_adjustment(team_objects, game_objects):
     # test neutral location (arizona)
     game3 = houq.filter_by(away_team_id='KC').first()
     game3.neutral_destination_id = 'ARI'
-    neutral_lat = Team.query.get(game3.neutral_destination_id).latitude
-    neutral_long = Team.query.get(game3.neutral_destination_id).longitude
+    neutral_lat = m.db.session.get(m.Team, game3.neutral_destination_id).latitude
+    neutral_long = m.db.session.get(m.Team, game3.neutral_destination_id).longitude
     home_distance = get_distance(hou.latitude,
                                  hou.longitude,
                                  neutral_lat,

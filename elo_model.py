@@ -1,5 +1,5 @@
 import numpy as np
-from main import Team
+from main import Team, db
 
 """
 Elo model developed by Jay Boice at FiveThirtyEight.
@@ -56,16 +56,16 @@ def elo_team_adjustment(game):
         buy, and playoffs. Difference is relative to teamA => positive means elodiff is added
         to teamA temporary Elo, negative means difference is added to teamB temp Elo.
     """
-    home_team = Team.query.get(game.home_team_id)
-    away_team = Team.query.get(game.away_team_id)
+    home_team = db.session.get(Team, game.home_team_id)
+    away_team = db.session.get(Team, game.away_team_id)
     home_team_elo = home_team.elo
     away_team_elo = away_team.elo
 
     # travel adjustment
     if game.neutral_destination_id != 'None':
         # Neutral game, make no base adjustment. Adjust both teams for distance only.
-        neutral_lat = Team.query.get(game.neutral_destination_id).latitude
-        neutral_long = Team.query.get(game.neutral_destination_id).longitude
+        neutral_lat = db.session.get(Team, game.neutral_destination_id).latitude
+        neutral_long = db.session.get(Team, game.neutral_destination_id).longitude
         home_travel_distance = get_distance(home_team.latitude,
                                             home_team.longitude,
                                             neutral_lat,
@@ -147,9 +147,9 @@ def postgame_elo_shift(game):
     point_diff = game.home_points - game.away_points
     elo_diff = elo_team_adjustment(game) # calcs wrt home team
     if point_diff == 0:
-        # Doesn't seem to be on the website explanation anymore but I'm keeping
-        # it because it makes sense that a team that is predicted to win ties
-        # should lose points.
+        # The explanation for accounting for a tie doesn't seem to be on the website
+        # anymore but I've decided to keep this value it because it makes sense 
+        # that a team that is predicted to win ties should lose points.
         mov = 1.525
     else:
         mov = np.log(abs(point_diff)+1)*(2.2/(elo_diff*0.001+2.2))
