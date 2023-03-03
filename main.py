@@ -71,6 +71,8 @@ class Game(db.Model):
     away_points = db.Column(db.Integer)
     home_team_id = db.Column(db.String(3))
     away_team_id = db.Column(db.String(3))
+    home_elo = db.Column(db.Integer)
+    away_elo = db.Column(db.Integer)
     day = db.Column(db.String)
     date = db.Column(db.String)
     neutral_destination_id = db.Column(db.String(4))
@@ -85,6 +87,8 @@ class Game(db.Model):
         self.playoff = playoff
         self.day = day
         self.date = date
+        self.home_elo = 0
+        self.away_elo = 0
 
 
 # Schema

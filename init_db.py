@@ -100,11 +100,12 @@ def build_game(cols, playoff=False):
 # store season data
 cwd = os.getcwd()
 for file in os.listdir(cwd+'/data'):
-    
+
     with open(cwd+'/data/'+file, 'r') as f:
         start_year = file.split('_')[1].split('.')[0]
         last_digits = str(int(start_year[-2:])+1)
-        season = Season(start_year + '-20' + last_digits)
+        season_id = start_year + '-20' + last_digits
+        season = Season(season_id)
         current_week = '0'
         playoff_bool = False
         weeks = []
@@ -123,7 +124,7 @@ for file in os.listdir(cwd+'/data'):
                 # make a new week
                 if weeks:
                     weeks[-1].games = games
-                weeks.append(Week(date + '-' + cols[0]))
+                weeks.append(Week(season_id + '-' + cols[0]))
                 games = []
                 current_week = cols[0]
                 

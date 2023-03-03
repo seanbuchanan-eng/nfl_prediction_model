@@ -1,4 +1,5 @@
 import numpy as np
+from main import Team
 
 """
 Elo model developed by Jay Boice at FiveThirtyEight.
@@ -55,22 +56,24 @@ def elo_team_adjustment(game):
         buy, and playoffs. Difference is relative to teamA => positive means elodiff is added
         to teamA temporary Elo, negative means difference is added to teamB temp Elo.
     """
-    home_team = game.home_team
-    away_team = game.away_team
+    home_team = Team.query.get(game.home_team_id)
+    away_team = Team.query.get(game.away_team_id)
     home_team_elo = home_team.elo
     away_team_elo = away_team.elo
 
     # travel adjustment
-    if game.neutral_destination:
+    if game.neutral_destination_id != 'None':
         # Neutral game, make no base adjustment. Adjust both teams for distance only.
+        neutral_lat = Team.query.get(game.neutral_destination_id).latitude
+        neutral_long = Team.query.get(game.neutral_destination_id).longitude
         home_travel_distance = get_distance(home_team.latitude,
                                             home_team.longitude,
-                                            game.neutral_destination[0],
-                                            game.neutral_destination[1])
+                                            neutral_lat,
+                                            neutral_long)
         away_travel_distance = get_distance(away_team.latitude,
                                             away_team.longitude,
-                                            game.neutral_destination[0],
-                                            game.neutral_destination[1])
+                                            neutral_lat,
+                                            neutral_long)
         home_team_elo -= round(home_travel_distance*0.004)
         away_team_elo -= round(away_travel_distance*0.004)
     else:
