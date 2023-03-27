@@ -138,12 +138,13 @@ for file in os.listdir(cwd+'/data'):
             date = cols[2]
 
             if cols[0] != current_week:
+                current_week = cols[0]
+
                 # make a new week
                 if weeks:
                     weeks[-1].games = games
-                weeks.append(Week(season_id + '-' + cols[0]))
+                weeks.append(Week(season_id + '-' + cols[0], current_week))
                 games = []
-                current_week = cols[0]
                 
             games.append(build_game(cols, playoff=playoff_bool))
             

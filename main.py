@@ -51,14 +51,16 @@ class Season(db.Model):
 class Week(db.Model):
     __tablename__ = 'weeks'
 
-    # number is the assciated week number of the season
+    # id is the assciated week number of the season
     # example yyyy-mm-dd-1 or yyyy-mm-dd-WildCard
-    number = db.Column(db.String, primary_key=True)
+    id = db.Column(db.String, primary_key=True)
+    number = db.Column(db.String)
     season_id = db.Column(db.String(9), db.ForeignKey('seasons.year'))
     year = db.relationship('Season', back_populates='weeks')
     games = db.relationship('Game', back_populates='week')
 
-    def __init__(self, number) -> None:
+    def __init__(self, id, number) -> None:
+        self.id = id
         self.number = number
 
 class Game(db.Model):
@@ -94,13 +96,59 @@ class Game(db.Model):
 # Schema
 class TeamSchema(ma.Schema):
     class Meta:
-        fields = ('id', 'name', 'latitude', 'longitude', 'elo')
+        fields = ('id', 'name', 'elo')
 
-# TODO: Add Schema for other models
+class GameSchema(ma.Schema):
+    class Meta:
+        fields = ('id','home_points','away_points')
+
+class SeasonSchema(ma.Schema):
+    class Meta:
+        fields= ('year',)
+
+class WeekSchema(ma.Schema):
+    class Meta:
+        fields= ('id', 'number', 'year')
 
 # Initialize schema
 team_schema = TeamSchema()
 teams_schema = TeamSchema(many=True)
+game_schema = GameSchema()
+games_schema = GameSchema(many=True)
+season_schema = SeasonSchema()
+seasons_schema = SeasonSchema(many=True)
+week_schema = WeekSchema()
+weeks_schema = WeekSchema(many=True)
 
 # For initializing the db from the CLI
 app.app_context().push()
+
+# routes
+@app.route('/seasons', methods=['GET'])
+def get_seasons():
+    all_seasons = db.session.query(Season).all()
+    result = seasons_schema.dump(all_seasons)
+
+    return seasons_schema.jsonify(result)
+
+@app.route('/weeks/<season_id>', methods=['GET'])
+def get_weeks(season_id):
+    all_season_weeks = db.session.query(Week, season_id).all()
+    result = seasons_schema.dump(all_season_weeks)
+
+    return seasons_schema.jsonify(result)
+
+@app.route('/team/<id>', methods=['GET'])
+def get_team(id):
+    team = db.session.get(Team, id)
+
+    return team_schema.jsonify(team)
+
+@app.route('/game/<id>', methods=['GET'])
+def get_game(id):
+    game = db.session.get(Game, id)
+
+    return game_schema.jsonify(game)
+
+if __name__ == '__main__':
+    app.run(debug=True)
