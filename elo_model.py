@@ -1,5 +1,4 @@
 import numpy as np
-from main import Team, db
 
 """
 Elo model developed by Jay Boice at FiveThirtyEight.
@@ -34,7 +33,7 @@ def get_distance(teamA_lat, teamA_long, teamB_lat, teamB_long):
 
     return distance/1.609 # Miles
 
-def elo_team_adjustment(game):
+def elo_team_adjustment(home_team_id, away_team_id, playoff, cur):
     """
     Adjusts base elo rating for home field, travel distance, bye week,
     and playoffs. Adjusts relative to the home team, therefore a negative
@@ -56,57 +55,59 @@ def elo_team_adjustment(game):
         buy, and playoffs. Difference is relative to teamA => positive means elodiff is added
         to teamA temporary Elo, negative means difference is added to teamB temp Elo.
     """
-    home_team = db.session.get(Team, game.home_team_id)
-    away_team = db.session.get(Team, game.away_team_id)
-    home_team_elo = home_team.elo
-    away_team_elo = away_team.elo
+    home_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE id = ? ", 
+                                (home_team_id,)).fetchall()[0]
+    away_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE id = ? ", 
+                                (away_team_id,)).fetchall()[0]
+    home_team_elo = home_team[2]
+    away_team_elo = away_team[2]
 
     # travel adjustment
-    if game.neutral_destination_id != 'None':
-        # Neutral game, make no base adjustment. Adjust both teams for distance only.
-        neutral_lat = db.session.get(Team, game.neutral_destination_id).latitude
-        neutral_long = db.session.get(Team, game.neutral_destination_id).longitude
-        home_travel_distance = get_distance(home_team.latitude,
-                                            home_team.longitude,
-                                            neutral_lat,
-                                            neutral_long)
-        away_travel_distance = get_distance(away_team.latitude,
-                                            away_team.longitude,
-                                            neutral_lat,
-                                            neutral_long)
-        home_team_elo -= round(home_travel_distance*0.004)
-        away_team_elo -= round(away_travel_distance*0.004)
-    else:
-        distance = get_distance(home_team.latitude,
-                                home_team.longitude,
-                                away_team.latitude,
-                                away_team.longitude)
-        home_team_elo += 48
-        home_team_elo += round(distance*0.004)
+    # if game.neutral_destination_id != 'None':
+    #     # Neutral game, make no base adjustment. Adjust both teams for distance only.
+    #     neutral_lat = db.session.get(Team, game.neutral_destination_id).latitude
+    #     neutral_long = db.session.get(Team, game.neutral_destination_id).longitude
+    #     home_travel_distance = get_distance(home_team.latitude,
+    #                                         home_team.longitude,
+    #                                         neutral_lat,
+    #                                         neutral_long)
+    #     away_travel_distance = get_distance(away_team.latitude,
+    #                                         away_team.longitude,
+    #                                         neutral_lat,
+    #                                         neutral_long)
+    #     home_team_elo -= round(home_travel_distance*0.004)
+    #     away_team_elo -= round(away_travel_distance*0.004)
+    # else:
+    distance = get_distance(home_team[0],
+                            home_team[1],
+                            away_team[0],
+                            away_team[1])
+    home_team_elo += 48
+    home_team_elo += round(distance*0.004)
 
     # bye adjustment
-    if home_team.bye:
-        home_team_elo += 25
-    elif away_team.bye:
-        away_team_elo += 25
-    else:
-        pass
+    # if home_team.bye:
+    #     home_team_elo += 25
+    # elif away_team.bye:
+    #     away_team_elo += 25
+    # else:
+    #     pass
 
     # playoff adjustment
-    if game.playoff:
+    if playoff:
         elo_diff = (home_team_elo - away_team_elo)*1.2
     else:
         elo_diff = (home_team_elo - away_team_elo)
 
     return elo_diff
 
-def win_prob(game):
+def win_prob(game, cur):
     "Calculates win probability with respect to the home team"
-    elo_diff = elo_team_adjustment(game)
+    elo_diff = elo_team_adjustment(game[0], game[1], game[-1], cur)
     win_probability = 1/(10**(-elo_diff/400)+1)
     return win_probability
 
-def postgame_elo_shift(game):
+def postgame_elo_shift(game, cur):
     """
     Calculates the points to be added or subtracted to the home team.
     The opposite must be done to the away team.
@@ -131,21 +132,24 @@ def postgame_elo_shift(game):
         based on the game result. Positive indicates points go to teamA, negative
         indicates points go to teamB.
     """
+    home_points = game[2]
+    away_points = game[3]
+
     # recommended K-factor
     K = 20 
     
     # forcast delta
-    win_probability = win_prob(game)
-    if game.home_points == game.away_points:
+    win_probability = win_prob(game, cur)
+    if home_points == away_points:
         forecast_delta = 0.5 - win_probability
-    elif game.home_points > game.away_points:
+    elif home_points > away_points:
         forecast_delta = 1 - win_probability
     else:
         forecast_delta = 0 - win_probability
     
     # mov multiplier
-    point_diff = game.home_points - game.away_points
-    elo_diff = elo_team_adjustment(game) # calcs wrt home team
+    point_diff = home_points - away_points
+    elo_diff = elo_team_adjustment(game[0], game[1], game[-1], cur) # calcs wrt home team
     if point_diff == 0:
         # The explanation for accounting for a tie doesn't seem to be on the website
         # anymore but I've decided to keep this value it because it makes sense 
@@ -156,7 +160,7 @@ def postgame_elo_shift(game):
 
     return round(K*forecast_delta*mov)
 
-def pre_season_elo(team):
+def pre_season_elo(elo):
     """
     Calculate team's pre-season elo rating. It is essentially
     just a regression to the mean.
@@ -172,5 +176,5 @@ def pre_season_elo(team):
         New elo value for team.
     """
     mean = 1505
-    new_elo = team.elo - (team.elo - mean)/3
+    new_elo = elo - (elo - mean)/3
     return round(new_elo)        

@@ -1,7 +1,8 @@
 import os
-from main import db
-from main import Team, Season, Week, Game
+import sqlite3
 
+# team and superbowl location data
+# name, lat, long, ticker
 teams = {
     "Kansas City Chiefs": [39.099789, -94.578560, "KC"],
     "Houston Texans": [29.760427, -95.369804, "HOU"],
@@ -58,16 +59,53 @@ superbowl_locations = {
     '2025': 'NO'
 }
 
-db.create_all()
+conn = sqlite3.connect('db.sqlite')
+cur = conn.cursor()
 
-# make teams
-for name, values in teams.items():
-    # TODO account for teams that moved
-    db.session.add(
-        Team(values[2], name, values[0], values[1], 1505, False)
-    )
+cur.executescript("""
+DROP TABLE IF EXISTS GameJunction;
+DROP TABLE IF EXISTS HomeTeam;
+DROP TABLE IF EXISTS AwayTeam;                                     
+DROP TABLE IF EXISTS Teams;
+DROP TABLE IF EXISTS Games;
+DROP TABLE IF EXISTS Seasons;
+DROP TABLE IF EXISTS Weeks;
 
-def build_game(cols, playoff=False):
+CREATE TABLE Seasons (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    season TEXT UNIQUE,
+    length INTEGER                                                          
+);
+
+CREATE TABLE Weeks (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    week TEXT UNIQUE                                        
+);
+
+CREATE TABLE Teams (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    ticker TEXT UNIQUE,
+    name TEXT UNIQUE,
+    latitude REAL,
+    longitude REAL,
+    elo INTEGER                                                                                                          
+);                                                   
+
+CREATE TABLE Games (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,
+    season_id INTEGER,
+    week_id INTEGER,
+    home_team TEXT,
+    away_team TEXT,                                    
+    home_points INTEGER,
+    away_points INTEGER,
+    home_pregame_elo INTEGER,
+    away_pregame_elo INTEGER,                                    
+    playoffs INTEGER                                                                                                                                                      
+);                                                                                                            
+""")
+
+def add_game(cols, season_id, week_id, playoffs):
     day = cols[1]
     date = cols[2]
     winner = cols[4]
@@ -79,79 +117,109 @@ def build_game(cols, playoff=False):
     winner_turnovers = cols[11]
     loser_yards = cols[12]
     loser_turnovers = cols[13]
-    neutral_game = False
+    
+    # if playoffs: playoffs = 1
+    # else: playoffs = 0
 
     if 'Washington' in winner:
         winner = 'Washington Commanders'
     elif 'Washington' in loser:
         loser = 'Washington Commanders'
 
-    if symbol == '':
-        home_team_id = teams[winner][2]
-        away_team_id = teams[loser][2]
+    if symbol == "":
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( winner, ))
+        home_team_id = cur.fetchone()[0]
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( loser, ))
+        away_team_id = cur.fetchone()[0]
         home_team_points = winner_points
         away_team_points = loser_points
+        home_team = winner
+        away_team = loser
     elif symbol == '@':
-        home_team_id = teams[loser][2]
-        away_team_id = teams[winner][2]
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( loser, ))
+        home_team_id = cur.fetchone()[0]
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( winner, ))
+        away_team_id = cur.fetchone()[0]
         home_team_points = loser_points
         away_team_points = winner_points
+        home_team = loser
+        away_team = winner
     elif symbol == 'N':
         # assign winner to hometeam and loser to awayteam
-        home_team_id = teams[winner][2]
-        away_team_id = teams[loser][2]
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( winner, ))
+        home_team_id = cur.fetchone()[0]
+        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
+                                   ( loser, ))
+        away_team_id = cur.fetchone()[0]
         home_team_points = winner_points
         away_team_points = loser_points
-        neutral_game = True
+        home_team = winner
+        away_team = loser
 
-    game = Game(home_team_id, away_team_id, day, date)
-    game.home_points = home_team_points
-    game.away_points = away_team_points
+    # write game to db
+    cur.execute("""INSERT INTO Games 
+                (season_id, week_id, home_team, away_team,
+                 home_points, away_points, 
+                home_pregame_elo, away_pregame_elo, playoffs) 
+                VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (season_id, week_id, home_team, away_team, home_team_points, 
+                 away_team_points, 0, 0, playoffs))
 
-    if neutral_game:
-        game.neutral_destination_id = superbowl_locations[date.split('-')[0]]
-    if playoff:
-        game.playoff = True
-    return game
+# make teams table
+for name, values in teams.items():
+    # TODO account for teams that moved
+    cur.execute("""INSERT OR IGNORE INTO Teams (ticker, name, latitude, longitude, elo)
+                VALUES ( ?, ?, ?, ?, ?)""", 
+                ( values[2], name, values[0], values[1], 1505))
 
-# store season data
+current_weeks = ["0"]
+
 cwd = os.getcwd()
-for file in os.listdir(cwd+'/data'):
+for file in os.listdir(os.path.join(cwd, "data")):
+    start_year = file.split('_')[1].split('.')[0]
+    last_digits = str(int(start_year[-2:])+1)
+    season = start_year + '-20' + last_digits
 
-    with open(cwd+'/data/'+file, 'r') as f:
-        start_year = file.split('_')[1].split('.')[0]
-        last_digits = str(int(start_year[-2:])+1)
-        season_id = start_year + '-20' + last_digits
-        season = Season(season_id)
-        current_week = '0'
-        playoff_bool = False
-        weeks = []
+    # insert season into db Seasons table
+    cur.execute("""INSERT OR IGNORE INTO Seasons (season, length)
+                VALUES ( ?, ? )""", ( season, 17))
+    cur.execute("""SELECT id FROM Seasons WHERE season = ? """, ( season, ))
+    season_id = cur.fetchone()[0]
+    print(season_id)
+
+    playoff_bool = False
+    # open file and read data
+    with open(os.path.join(cwd, "data", file), "r") as f:
         for line in f:
-            cols = line.split(',')
+            cols = line.split(",")
 
-            if cols[0] == 'Week':
+            if cols[0] == "Week":
                 continue
-            if cols[2] == 'Playoffs':
+            if cols[2] == "Playoffs":
                 playoff_bool = True
                 continue
 
-            date = cols[2]
+            week = cols[0]
 
-            if cols[0] != current_week:
-                current_week = cols[0]
+            # insert week into Weeks table
+            if week not in current_weeks:
+                cur.execute("""INSERT OR IGNORE INTO Weeks (week)
+                            VALUES ( ? )""", ( week, ))
+                current_weeks.append(week)
 
-                # make a new week
-                if weeks:
-                    weeks[-1].games = games
-                weeks.append(Week(season_id + '-' + cols[0], current_week))
-                games = []
-                
-            games.append(build_game(cols, playoff=playoff_bool))
-            
-            # add last games to the last week
-            if current_week == 'SuperBowl':
-                weeks[-1].games = games
-                season.weeks = weeks
-                db.session.add(season)
+            cur.execute("""SELECT id FROM Weeks WHERE week = ? """, ( week, ))
+            week_id = cur.fetchone()[0]
 
-db.session.commit()
+            #insert into games table
+            add_game(cols, season_id, week_id, playoff_bool)
+
+            if week == '18':
+                cur.execute("UPDATE Seasons SET length=18 WHERE id = ? ", ( season_id, ))
+
+conn.commit()
+conn.close()
