@@ -55,9 +55,9 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, cur):
         buy, and playoffs. Difference is relative to teamA => positive means elodiff is added
         to teamA temporary Elo, negative means difference is added to teamB temp Elo.
     """
-    home_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE id = ? ", 
+    home_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE name = ? ", 
                                 (home_team_id,)).fetchall()[0]
-    away_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE id = ? ", 
+    away_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE name = ? ", 
                                 (away_team_id,)).fetchall()[0]
     home_team_elo = home_team[2]
     away_team_elo = away_team[2]
