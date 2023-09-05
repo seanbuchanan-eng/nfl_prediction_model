@@ -33,7 +33,7 @@ def get_distance(teamA_lat, teamA_long, teamB_lat, teamB_long):
 
     return distance/1.609 # Miles
 
-def elo_team_adjustment(home_team_id, away_team_id, playoff, cur):
+def elo_team_adjustment(home_team_id, away_team_id, playoff, neutral_dest, cur):
     """
     Adjusts base elo rating for home field, travel distance, bye week,
     and playoffs. Adjusts relative to the home team, therefore a negative
@@ -63,29 +63,29 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, cur):
     away_team_elo = away_team[2]
 
     # travel adjustment
-    # if game.neutral_destination_id != 'None':
-    #     # Neutral game, make no base adjustment. Adjust both teams for distance only.
-    #     neutral_lat = db.session.get(Team, game.neutral_destination_id).latitude
-    #     neutral_long = db.session.get(Team, game.neutral_destination_id).longitude
-    #     home_travel_distance = get_distance(home_team.latitude,
-    #                                         home_team.longitude,
-    #                                         neutral_lat,
-    #                                         neutral_long)
-    #     away_travel_distance = get_distance(away_team.latitude,
-    #                                         away_team.longitude,
-    #                                         neutral_lat,
-    #                                         neutral_long)
-    #     home_team_elo -= round(home_travel_distance*0.004)
-    #     away_team_elo -= round(away_travel_distance*0.004)
-    # else:
-    distance = get_distance(home_team[0],
-                            home_team[1],
-                            away_team[0],
-                            away_team[1])
-    home_team_elo += 48
-    home_team_elo += round(distance*0.004)
+    if neutral_dest != 'None':
+        # Neutral game, make no base adjustment. Adjust both teams for distance only.
+        neutral_lat, neutral_long = cur.execute("SELECT latitude, longitude FROM Teams WHERE ticker = ?", 
+                                  (neutral_dest,)).fetchall()[0]
+        home_travel_distance = get_distance(home_team[0],
+                                            home_team[1],
+                                            neutral_lat,
+                                            neutral_long)
+        away_travel_distance = get_distance(away_team[0],
+                                            away_team[1],
+                                            neutral_lat,
+                                            neutral_long)
+        home_team_elo -= round(home_travel_distance*0.004)
+        away_team_elo -= round(away_travel_distance*0.004)
+    else:
+        distance = get_distance(home_team[0],
+                                home_team[1],
+                                away_team[0],
+                                away_team[1])
+        home_team_elo += 48
+        home_team_elo += round(distance*0.004)
 
-    # bye adjustment
+    # bye adjustment (still need to implement when setting up the db)
     # if home_team.bye:
     #     home_team_elo += 25
     # elif away_team.bye:
@@ -103,7 +103,7 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, cur):
 
 def win_prob(game, cur):
     "Calculates win probability with respect to the home team"
-    elo_diff = elo_team_adjustment(game[0], game[1], game[-1], cur)
+    elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur)
     win_probability = 1/(10**(-elo_diff/400)+1)
     return win_probability
 
@@ -149,13 +149,15 @@ def postgame_elo_shift(game, cur):
     
     # mov multiplier
     point_diff = home_points - away_points
-    elo_diff = elo_team_adjustment(game[0], game[1], game[-1], cur) # calcs wrt home team
+    elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur) # calcs wrt home team
     if point_diff == 0:
         # The explanation for accounting for a tie doesn't seem to be on the website
         # anymore but I've decided to keep this value it because it makes sense 
         # that a team that is predicted to win ties should lose points.
         mov = 1.525
     else:
+        if point_diff < 0:
+            elo_diff *= -1
         mov = np.log(abs(point_diff)+1)*(2.2/(elo_diff*0.001+2.2))
 
     return round(K*forecast_delta*mov)

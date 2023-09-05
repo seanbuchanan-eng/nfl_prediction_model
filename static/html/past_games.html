@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet", href="../css/past_games.css">
+    
+    <title>NFL Prediction</title>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a class="active" href="past_games.html">Past Games</a></li>
+            <li><a href="upcoming_games.html">Upcoming Games</a></li>
+            <li style="float:right"><a href="about.html">About</a></li>
+        </ul>
+    </nav>
+    <main>
+        <h1 class="title_header">PAST GAMES</h1>
+        <p>See how the prediction model did on past games! Select a season and week to see
+            if the model correctly predicted the spread.
+        </p>
+        <form action="updatePastGamesPage()">
+        <div class="dropdown_container">
+            <div class="seasons_dropdown">
+                <label for="seasons_dropdown"><h3><b>Season:</b></h3></label>
+                <select name="seasons_dropdown" id="seasons_dropdown" onchange="updatePastGamesPage()"></select>
+            </div>
+            <div class="weeks_dropdown">
+                <label for="weeks_dropdown"><h3><b>Week:</b></h3></label>
+                <select name="weeks_dropdown" id="weeks_dropdown" onchange="updatePastGamesPage()"></select>
+            </div>
+        </div>
+        </form>
+        <h1 id="week_header"></h1>
+        <section class="game_cards" id="game_cards"></section>
+    </main>
+    <footer>NFL Prediction</footer>
+    <script src="../js/nfl_model.js"></script>
+</body>
+</html>

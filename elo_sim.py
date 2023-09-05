@@ -6,12 +6,12 @@ from elo_model import postgame_elo_shift, pre_season_elo, elo_team_adjustment
 conn = sqlite3.connect('db.sqlite')
 cur = conn.cursor()
 
+cur.execute("UPDATE Teams SET elo=1505")
+conn.commit()
+
 seasons = cur.execute("SELECT season FROM Seasons").fetchall()
 teams = cur.execute("SELECT * FROM Teams").fetchall()
 weeks = cur.execute("SELECT week FROM Weeks").fetchall()
-
-cur.execute("UPDATE Teams SET elo=1505")
-conn.commit()
 
 for idx, season in enumerate(seasons):
     season = season[0]
@@ -22,14 +22,13 @@ for idx, season in enumerate(seasons):
                     ( elo, team[0] ))
     conn.commit()
 
-    games = cur.execute("")
-
     season_len = cur.execute("SELECT length FROM Seasons WHERE season = ? ", ( season, )).fetchone()[0]
     weeks = list(range(1,season_len+1)) + ["WildCard", "Division", "ConfChamp", "SuperBowl"]
 
     for week in weeks:
         games = cur.execute("""SELECT Games.home_team, Games.away_team,
-                            Games.home_points, Games.away_points, Games.playoffs 
+                            Games.home_points, Games.away_points, Games.playoffs,
+                            Games.neutral_destination 
                             FROM Games JOIN Weeks JOIN Seasons 
                             on Games.week_id = Weeks.id and Games.season_id = Seasons.id 
                             WHERE Weeks.week = ? and Seasons.season = ? """,
@@ -39,7 +38,9 @@ for idx, season in enumerate(seasons):
         for game in games:
             home_team = game[0]
             away_team = game[1]
-            pregame_elo_shift = elo_team_adjustment(game[0], game[1], game[-1], cur)
+            playoffs = game[4]
+            neutral_dest = game[5]
+            pregame_elo_shift = elo_team_adjustment(home_team, away_team, playoffs, neutral_dest, cur)
             elo_shift = postgame_elo_shift(game, cur)
 
             home_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (home_team,)).fetchone()[0]

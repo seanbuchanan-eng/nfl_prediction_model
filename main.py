@@ -1,10 +1,10 @@
 import os
 import sqlite3
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -12,10 +12,17 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 conn = sqlite3.connect('db.sqlite', check_same_thread=False)
 cur = conn.cursor()
 
-# For initializing the db from the CLI
-# app.app_context().push()
-
 # routes
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path.endswith("html") and os.path.exists(app.static_folder + '/html/' + path):
+        return send_from_directory(app.static_folder, '/html' + path)
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'html/home.html')
+
 @app.route('/seasons', methods=['GET'])
 def get_seasons():
     all_seasons = cur.execute("SELECT season, length FROM Seasons").fetchall()

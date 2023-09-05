@@ -101,7 +101,10 @@ CREATE TABLE Games (
     away_points INTEGER,
     home_pregame_elo INTEGER,
     away_pregame_elo INTEGER,                                    
-    playoffs INTEGER                                                                                                                                                      
+    playoffs INTEGER,
+    home_bye INTEGER,
+    away_bye INTEGER,
+    neutral_destination TEXT                                                                                                                                                                                                       
 );                                                                                                            
 """)
 
@@ -117,9 +120,8 @@ def add_game(cols, season_id, week_id, playoffs):
     winner_turnovers = cols[11]
     loser_yards = cols[12]
     loser_turnovers = cols[13]
-    
-    # if playoffs: playoffs = 1
-    # else: playoffs = 0
+    neutral_game = False
+
 
     if 'Washington' in winner:
         winner = 'Washington Commanders'
@@ -160,15 +162,22 @@ def add_game(cols, season_id, week_id, playoffs):
         away_team_points = loser_points
         home_team = winner
         away_team = loser
+        neutral_game = True
+
+    if neutral_game:
+        game_destination = superbowl_locations[date.split('-')[0]]
+    else:
+        game_destination = "None"       
 
     # write game to db
     cur.execute("""INSERT INTO Games 
                 (season_id, week_id, home_team, away_team,
                  home_points, away_points, 
-                home_pregame_elo, away_pregame_elo, playoffs) 
-                VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                home_pregame_elo, away_pregame_elo, playoffs,
+                home_bye, away_bye, neutral_destination) 
+                VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (season_id, week_id, home_team, away_team, home_team_points, 
-                 away_team_points, 0, 0, playoffs))
+                 away_team_points, 0, 0, playoffs, 0, 0, game_destination))
 
 # make teams table
 for name, values in teams.items():
