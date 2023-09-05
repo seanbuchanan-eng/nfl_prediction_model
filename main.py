@@ -17,11 +17,11 @@ cur = conn.cursor()
 @app.route('/<path:path>')
 def serve(path):
     if path.endswith("html") and os.path.exists(app.static_folder + '/html/' + path):
-        return send_from_directory(app.static_folder, '/html' + path)
+        return send_from_directory(app.static_folder, 'html/' + path)
     if path != "" and os.path.exists(app.static_folder + '/' + path):
         return send_from_directory(app.static_folder, path)
     else:
-        return send_from_directory(app.static_folder, 'html/home.html')
+        return send_from_directory(app.static_folder, '/html/home.html')
 
 @app.route('/seasons', methods=['GET'])
 def get_seasons():
