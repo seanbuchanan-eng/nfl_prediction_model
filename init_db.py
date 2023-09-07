@@ -126,7 +126,18 @@ def add_game(cols, season_id, week_id, playoffs):
     loser_turnovers = cols[13]
     neutral_game = False
 
-
+    if winner == 'Oakland Raiders':
+        winner = 'Las Vegas Raiders'
+    if loser == 'Oakland Raiders':
+        loser = 'Las Vegas Raiders'
+    if winner == 'San Diego Chargers':
+        winner = 'Los Angeles Chargers'
+    if loser == 'San Diego Chargers':
+        loser = 'Los Angeles Chargers'
+    if winner == 'St. Louis Rams':
+        winner = 'Los Angeles Rams'
+    if loser == 'St. Louis Rams':
+        loser = 'Los Angeles Rams'
     if 'Washington' in winner:
         winner = 'Washington Commanders'
     elif 'Washington' in loser:
@@ -188,6 +199,15 @@ def add_game(cols, season_id, week_id, playoffs):
 # make teams table
 for name, values in teams.items():
     # TODO account for teams that moved
+    if name == 'Oakland Raiders':
+        name = 'Las Vegas Raiders'
+    elif name == 'San Diego Chargers':
+        name = 'Los Angeles Chargers'
+    elif name == 'St. Louis Rams':
+        name = 'Los Angeles Rams'
+    elif 'Washington' in name:
+        name = 'Washington Commanders'
+
     cur.execute("""INSERT OR IGNORE INTO Teams (ticker, name, latitude, longitude, elo)
                 VALUES ( ?, ?, ?, ?, ?)""", 
                 ( values[2], name, values[0], values[1], 1505))
