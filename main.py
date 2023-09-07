@@ -21,7 +21,7 @@ def serve(path):
     if path != "" and os.path.exists(app.static_folder + '/' + path):
         return send_from_directory(app.static_folder, path)
     else:
-        return send_from_directory(app.static_folder, '/html/home.html')
+        return send_from_directory(app.static_folder, 'html/home.html')
 
 @app.route('/seasons', methods=['GET'])
 def get_seasons():
