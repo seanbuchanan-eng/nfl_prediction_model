@@ -99,7 +99,7 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, neutral_dest, cur):
     else:
         elo_diff = (home_team_elo - away_team_elo)
 
-    return elo_diff
+    return round(elo_diff)
 
 def win_prob(game, cur):
     "Calculates win probability with respect to the home team"
