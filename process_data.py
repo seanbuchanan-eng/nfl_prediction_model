@@ -436,6 +436,5 @@ for game in rest_of_data:
     last_14_games[away_team_name]["turnovers_for"].pop(0)
     last_14_games[away_team_name]["turnovers_against"].pop(0)
 
-    conn.commit()
-
+conn.commit()
 conn.close()
