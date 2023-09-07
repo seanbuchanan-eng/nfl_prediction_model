@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 db.sqlite-journal
+~*
+ai_model_notes.docx

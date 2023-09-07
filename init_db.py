@@ -99,6 +99,10 @@ CREATE TABLE Games (
     away_team TEXT,                                    
     home_points INTEGER,
     away_points INTEGER,
+    home_yards INTEGER,
+    away_yards INTEGER,                                    
+    home_turnovers INTEGER,
+    away_turnovers INTEGER,                                  
     home_pregame_elo INTEGER,
     away_pregame_elo INTEGER,                                    
     playoffs INTEGER,
@@ -139,29 +143,29 @@ def add_game(cols, season_id, week_id, playoffs):
         away_team_points = loser_points
         home_team = winner
         away_team = loser
+        home_yards = winner_yards
+        away_yards = loser_yards
+        home_turnovers = winner_turnovers
+        away_turnovers = loser_turnovers
     elif symbol == '@':
-        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
-                                   ( loser, ))
-        home_team_id = cur.fetchone()[0]
-        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
-                                   ( winner, ))
-        away_team_id = cur.fetchone()[0]
         home_team_points = loser_points
         away_team_points = winner_points
         home_team = loser
         away_team = winner
+        home_yards = loser_yards
+        away_yards = winner_yards
+        home_turnovers = loser_turnovers
+        away_turnovers = winner_turnovers
     elif symbol == 'N':
         # assign winner to hometeam and loser to awayteam
-        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
-                                   ( winner, ))
-        home_team_id = cur.fetchone()[0]
-        cur.execute("""SELECT id FROM Teams WHERE name = ?""",
-                                   ( loser, ))
-        away_team_id = cur.fetchone()[0]
         home_team_points = winner_points
         away_team_points = loser_points
         home_team = winner
         away_team = loser
+        home_yards = winner_yards
+        away_yards = loser_yards
+        home_turnovers = winner_turnovers
+        away_turnovers = loser_turnovers
         neutral_game = True
 
     if neutral_game:
@@ -172,12 +176,14 @@ def add_game(cols, season_id, week_id, playoffs):
     # write game to db
     cur.execute("""INSERT INTO Games 
                 (season_id, week_id, home_team, away_team,
-                 home_points, away_points, 
+                 home_points, away_points, home_yards,
+                away_yards, home_turnovers, away_turnovers,
                 home_pregame_elo, away_pregame_elo, playoffs,
                 home_bye, away_bye, neutral_destination) 
-                VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (season_id, week_id, home_team, away_team, home_team_points, 
-                 away_team_points, 0, 0, playoffs, 0, 0, game_destination))
+                 away_team_points, home_yards, away_yards, home_turnovers,
+                 away_turnovers, 0, 0, playoffs, 0, 0, game_destination))
 
 # make teams table
 for name, values in teams.items():
