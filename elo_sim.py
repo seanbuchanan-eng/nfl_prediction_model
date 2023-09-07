@@ -28,18 +28,18 @@ for idx, season in enumerate(seasons):
     for week in weeks:
         games = cur.execute("""SELECT Games.home_team, Games.away_team,
                             Games.home_points, Games.away_points, Games.playoffs,
-                            Games.neutral_destination 
+                            Games.neutral_destination, Games.id
                             FROM Games JOIN Weeks JOIN Seasons 
                             on Games.week_id = Weeks.id and Games.season_id = Seasons.id 
                             WHERE Weeks.week = ? and Seasons.season = ? """,
                             ( week, season) ).fetchall()
-        conn.commit()
         
         for game in games:
             home_team = game[0]
             away_team = game[1]
             playoffs = game[4]
             neutral_dest = game[5]
+            game_id = game[6]
             pregame_elo_shift = elo_team_adjustment(home_team, away_team, playoffs, neutral_dest, cur)
             elo_shift = postgame_elo_shift(game, cur)
 
@@ -47,10 +47,10 @@ for idx, season in enumerate(seasons):
             away_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (away_team,)).fetchone()[0]
             home_pregame_elo = home_team_elo + pregame_elo_shift
             away_pregame_elo = away_team_elo - pregame_elo_shift            
-            cur.execute("UPDATE Games SET home_pregame_elo = ? WHERE home_team = ?", 
-                        (home_pregame_elo, home_team))
-            cur.execute("UPDATE Games SET away_pregame_elo = ? WHERE away_team = ?", 
-                        (away_pregame_elo, away_team))
+            cur.execute("UPDATE Games SET home_pregame_elo = ? WHERE id = ?", 
+                        (home_pregame_elo, game_id))
+            cur.execute("UPDATE Games SET away_pregame_elo = ? WHERE id = ?", 
+                        (away_pregame_elo, game_id))
 
             away_team_elo -= elo_shift
             home_team_elo += elo_shift
