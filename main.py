@@ -51,6 +51,29 @@ def get_week_games(season, week):
     result = json.dumps(games)
     return result
 
+@app.route('/ai-games/<season>/<week>', methods=['GET'])
+def get_ai_pred(season, week):
+    games = cur.execute("""SELECT Games.home_team, Games.away_team,
+                        Games.home_points, Games.away_points, 
+                        AiInput.elo_pred_spread, AiInput.ai_spread
+                        FROM Games JOIN Weeks JOIN Seasons JOIN AiInput
+                        on Games.week_id = Weeks.id 
+                        and Games.season_id = Seasons.id 
+                        and Games.id = AiInput.game_id
+                        WHERE Weeks.week = ? and Seasons.season = ?""",
+                        (week, season)).fetchall()
+    result = []
+    for game in games:
+        game_dict = {}
+        game_dict["home_team"] = game[0]
+        game_dict["away_team"] = game[1]
+        game_dict["home_points"] = game[2]
+        game_dict["away_points"] = game[3]
+        game_dict["elo_spread"] = game[4]
+        game_dict["ai_spread"] = game[5]
+        result.append(game_dict)
+    return json.dumps(result)
+
 def set_pregame_spread(games):
     neutral_dest = 'None'
     for game in games:
@@ -105,7 +128,7 @@ def serve_past_games():
         #increment week
         WEEK += 1
         #scrape and store globably
-        UPCOMING_GAMES = scraper.get_week_games(WEEK, SEASON, local_path='test_page.html')
+        UPCOMING_GAMES = scraper.get_week_games(WEEK, SEASON)#, local_path='test_page.html')
 
         for game in UPCOMING_GAMES:
             if game["pts_win"] == '': game["pts_win"] = '0'
@@ -117,13 +140,13 @@ def serve_past_games():
     #elif datetime > last games datetime
     elif now.date() > last_game_date:
         #scrape previous week
-        last_week_games = scraper.get_week_games(WEEK, SEASON, local_path='test_page.html')
+        last_week_games = scraper.get_week_games(WEEK, SEASON)#, local_path='test_page.html')
         
         # TODO move stored week to previous games storage
             #put function here
         
         WEEK += 1
-        UPCOMING_GAMES = scraper.get_week_games(WEEK, SEASON, local_path='test_page.html')
+        UPCOMING_GAMES = scraper.get_week_games(WEEK, SEASON)#, local_path='test_page.html')
 
         for game in UPCOMING_GAMES:
             if game["pts_win"] == '': game["pts_win"] = '0'
@@ -136,7 +159,6 @@ def serve_past_games():
 
     # TODO check for end of season somehow
         # do something about it
-    
 
 @app.route('/team/<name>', methods=['GET'])
 def get_team(name):
