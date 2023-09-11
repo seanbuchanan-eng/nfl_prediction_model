@@ -80,6 +80,15 @@ select {
     padding: 20px;
 }
 
+.radio_container {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-items: center;
+    width: 50%;
+    margin: auto;
+    padding: 10px;
+}
+
 .game_cards {
     display: flex;
     flex-wrap: wrap;
