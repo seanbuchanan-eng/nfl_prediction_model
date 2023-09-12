@@ -101,13 +101,12 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, neutral_dest, cur):
 
     return round(elo_diff)
 
-def win_prob(game, cur):
+def win_prob(elo_diff):
     "Calculates win probability with respect to the home team"
-    elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur)
     win_probability = 1/(10**(-elo_diff/400)+1)
     return win_probability
 
-def postgame_elo_shift(game, cur):
+def postgame_elo_shift(game, cur, elo_diff=None):
     """
     Calculates the points to be added or subtracted to the home team.
     The opposite must be done to the away team.
@@ -138,8 +137,11 @@ def postgame_elo_shift(game, cur):
     # recommended K-factor
     K = 20 
     
+    if not elo_diff:
+        elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur) # calcs wrt home team
+        
     # forcast delta
-    win_probability = win_prob(game, cur)
+    win_probability = win_prob(elo_diff)
     if home_points == away_points:
         forecast_delta = 0.5 - win_probability
     elif home_points > away_points:
@@ -149,7 +151,7 @@ def postgame_elo_shift(game, cur):
     
     # mov multiplier
     point_diff = home_points - away_points
-    elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur) # calcs wrt home team
+    
     if point_diff == 0:
         # The explanation for accounting for a tie doesn't seem to be on the website
         # anymore but I've decided to keep this value it because it makes sense 
