@@ -30,7 +30,7 @@ async function populateDropdowns() {
     weeksDropdown.innerHTML = weekHTML;
 }
 
-async function populateGameCards(season="2022-2023", week=1) {
+async function populateGameCards(season="2023-2024", week=1) {
     const gameResponse = await fetch(`http://127.0.0.1:5000/games/${season}/${week}`);
     const gameData = await gameResponse.json();
 
@@ -81,7 +81,7 @@ async function populateGameCards(season="2022-2023", week=1) {
     gameCards.innerHTML = cardHTML;
 }
 
-async function populateAiGameCards(season="2022-2023", week=1) {
+async function populateAiGameCards(season="2023-2024", week=1) {
     const gameResponse = await fetch(`http://127.0.0.1:5000/ai-games/${season}/${week}`);
     const gameData = await gameResponse.json();
 
