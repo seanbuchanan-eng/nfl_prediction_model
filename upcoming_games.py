@@ -1,5 +1,24 @@
 import elo_model
 import scraper
+from datetime import date
+
+def calc_last_game_date(games):
+    """
+    Calculate the last game date in a week of games.
+    
+    Parameters
+    ----------
+    games: dictionary of games for a week.
+
+    Returns
+    -------
+    Last date of a game as a date object.
+    """
+    last_game_date = games[-2]['game_date'].split('-')
+    last_game_date = date(int(last_game_date[0]), 
+                            int(last_game_date[1]), 
+                            int(last_game_date[2]))
+    return last_game_date
 
 def add_season_to_db(cur, conn):
     last_season = cur.execute("SELECT * FROM Seasons").fetchall()[-1]
@@ -39,10 +58,6 @@ def assign_home_away(game):
 def set_pregame_spread(games, cur):
     """
     Sets pregame spread for upcoming games.
-
-    Parameters
-    ----------
-    games: 
     """
     neutral_dest = 'None'
     for game in games:
@@ -107,9 +122,6 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
     week: current week of the season
     season: current season
     local_path: local path to an html file for debugging
-
-    Returns
-    -------
     """
     season_name = str(season) + "-" + str(season+1)
     season_id = cur.execute("SELECT id FROM Seasons WHERE season = ?", (season_name,)).fetchone()[0]
@@ -154,9 +166,6 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
         
         # team elo update
         elo_diff = int(home_elo) - int(away_elo)
-        if home_team == "New York Jets":
-            print(f"away_elo before: {away_elo}")
-            print(f"home_elo before: {home_elo}")
         elo_shift = elo_model.postgame_elo_shift(
             (None, None, int(home_points), int(away_points)),
             cur,
@@ -164,11 +173,6 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
             )
         away_elo -= elo_shift
         home_elo += elo_shift
-        if home_team == "New York Jets":
-            print(f"elo_diff: {elo_diff}")
-            print(f"elo_shift: {elo_shift}")
-            print(f"away_elo: {away_elo}")
-            print(f"home_elo: {home_elo}")
         cur.execute("UPDATE Teams SET elo = ? WHERE name = ?",
                     (home_elo, home_team))
         cur.execute("UPDATE Teams SET elo = ? WHERE name = ?",

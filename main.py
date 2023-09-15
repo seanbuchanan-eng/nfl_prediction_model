@@ -92,17 +92,8 @@ def serve_past_games():
     if PRESEASON_ELO:
         upcoming_games.add_season_to_db(cur, conn)
         upcoming_games.update_pre_season_elo(cur, conn)
-        PRESEASON_ELO = False
-        print("hit preseason loop")
+        PRESEASON_ELO = False      
 
-    if UPCOMING_GAMES:
-        # get date from last game in the week
-        now = datetime.now(timezone('EST'))
-        last_game_date = UPCOMING_GAMES[-2]['game_date'].split('-')
-        last_game_date = date(int(last_game_date[0]), 
-                              int(last_game_date[1]), 
-                              int(last_game_date[2]))
-    
     if WEEK == 0:
         WEEK += 1
         UPCOMING_GAMES = upcoming_games.update_week_games(cur,
@@ -110,7 +101,10 @@ def serve_past_games():
                                                           SEASON,
                                                           local_path='test_page.html')
 
-    elif now.date() > last_game_date:
+    now = datetime.now(timezone('EST'))
+    last_game_date = upcoming_games.calc_last_game_date(UPCOMING_GAMES)
+
+    while now.date() > last_game_date:
         upcoming_games.move_prev_week_to_db(cur, conn, WEEK, SEASON, local_path='test_page.html')
         
         WEEK += 1
@@ -118,6 +112,7 @@ def serve_past_games():
                                                           WEEK,
                                                           SEASON,
                                                           local_path='test_page.html')
+        last_game_date = upcoming_games.calc_last_game_date(UPCOMING_GAMES)
 
     return json.dumps(UPCOMING_GAMES)
 
