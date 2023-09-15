@@ -38,8 +38,8 @@ async function populateGameCards(season="2023-2024", week=1) {
     let homeSpread = 0;
     let awaySpread = 0;
     for (let game of gameData.values()) {
-        let homeElo = game[7];
-        let awayElo = game[8];
+        let homeElo = game[11];
+        let awayElo = game[12];
         let homePoints = game[5];
         let awayPoints = game[6];
         let predictionResult = "delete-2-16.png";
