@@ -5,6 +5,8 @@ import scraper
 import elo_sim
 import elo_model
 import init_db
+import process_train_test_data
+import process_inference_data
 import upcoming_games
 from datetime import datetime, date
 from pytz import timezone
@@ -14,6 +16,9 @@ from flask_cors import CORS
 def setup():
     init_db.run()
     elo_sim.run()
+    process_train_test_data.run()
+    process_inference_data.run()
+
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
