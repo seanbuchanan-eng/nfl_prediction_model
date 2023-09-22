@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet", href="../css/home.css">
     
+    <link rel="stylesheet", href="../css/about.css">
+
     <title>NFL Prediction</title>
 </head>
 <body>
@@ -16,6 +18,21 @@
             <li style="float:right"><a class="active" href="about.html">About</a></li>
         </ul>
     </nav>
-    
+    <main>
+        <h1>ABOUT</h1>
+        <p>The NFL Prediction website uses the <a href="https://fivethirtyeight.com/methodology/how-our-nfl-predictions-work/">elo model</a>
+            developed by FiveThirtyEight to predict the spread for upcoming NFL games. To improve the prediction
+            of the spread, a small Neural Network is fed mean values over the past 14 games for points,
+            elo, yards, and turnovers. The prediction is improved by half a point on average for the past
+            ten years. Further improvements to the AI portion of the website will be made in the future.
+        </p>
+        <p>A prediction is given a green check in <a href="past_games.html">past games</a>
+            if the predicted spread is within the bounds of the actual spread. Not if the 
+            model predicts it exactly right. Given the randomness of game outcomes that would
+            be unreasonable to expect.
+        </p>
+        <p>All data credits go to <a href="https://www.pro-football-reference.com/">Pro Football Reference</a>.</p>
+    </main>
+    <footer>NFL Prediction</footer>
 </body>
 </html>
