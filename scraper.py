@@ -58,9 +58,10 @@ def get_week_games(week_num, year=2023, local_path=None):
 
 
 if __name__ == '__main__':
+    pass
     # page = get_upcoming_games_page(2023)
     # with open('test_page.html', 'wb') as f:
     #     f.write(page.content)
     # soup = BeautifulSoup(page.content, "html.parser")
-    games = get_week_games(1, 2023, 'test_page.html')
-    print(games)
+    # games = get_week_games(1, 2023, 'test_page.html')
+    # print(games)
