@@ -2,8 +2,9 @@ import elo_model
 import scraper
 from datetime import date
 import pandas as pd
+import models
 import torch
-from torch import nn
+import numpy as np
 
 def calc_last_game_date(games):
     """
@@ -88,6 +89,65 @@ def set_pregame_spread(games, cur):
         game["home_spread"] = home_spread
         game["away_spread"] = away_spread
 
+def set_ai_pregame_spread(games, cur):
+    
+    for game in games:
+        # ensure that home_team has been 
+        try:
+            game["home_team"]
+            game["away_team"]
+        except KeyError:
+            print("pregame elo needs to be run on games before running set_ai_pregame_spread")
+        
+        home_data = cur.execute("""SELECT TeamAiData.* FROM 
+                                TeamAiData JOIN Teams
+                                on TeamAiData.team_id = Teams.id
+                                WHERE Teams.name = ?""",(game["home_team"],)).fetchall()[0]
+        away_data = cur.execute("""SELECT TeamAiData.* FROM 
+                                TeamAiData JOIN Teams
+                                on TeamAiData.team_id = Teams.id
+                                WHERE Teams.name = ?""",(game["away_team"],)).fetchall()[0]
+        
+        if home_data[2] == 1:
+            home_points_diff = np.mean(home_data[32:46]) - np.mean(home_data[46:60])
+            home_turnover_diff = np.mean(home_data[88:102]) - np.mean(home_data[102:116])
+            home_yard_diff = np.mean(home_data[60:74]) - np.mean(home_data[74:88])
+            home_elo_diff = np.mean(home_data[4:18]) - np.mean(home_data[18:32])
+        else:
+            home_points_diff = np.mean(home_data[145:159]) - np.mean(home_data[159:173])
+            home_turnover_diff = np.mean(home_data[201:215]) - np.mean(home_data[215:229])
+            home_yard_diff = np.mean(home_data[173:187]) - np.mean(home_data[187:201])
+            home_elo_diff = np.mean(home_data[117:131]) - np.mean(home_data[131:145])
+        if away_data[2] == 1:
+            away_points_diff = np.mean(away_data[32:46]) - np.mean(away_data[46:60])
+            away_turnover_diff = np.mean(away_data[88:102]) - np.mean(away_data[102:116])
+            away_yard_diff = np.mean(away_data[60:74]) - np.mean(away_data[74:88])
+            away_elo_diff = np.mean(away_data[4:18]) - np.mean(away_data[18:32])
+        else:
+            away_points_diff = np.mean(away_data[145:159]) - np.mean(away_data[159:173])
+            away_turnover_diff = np.mean(away_data[201:215]) - np.mean(away_data[215:229])
+            away_yard_diff = np.mean(away_data[173:187]) - np.mean(away_data[187:201])
+            away_elo_diff = np.mean(away_data[117:131]) - np.mean(away_data[131:145])
+
+        points_diff_diff = home_points_diff - away_points_diff
+        turnover_diff_diff = home_turnover_diff - away_turnover_diff
+        yards_diff_diff = home_yard_diff - away_yard_diff
+        elo_diff_diff = home_elo_diff - away_elo_diff
+        pred_spread = game["home_spread"]
+
+        input = torch.tensor([[elo_diff_diff,
+                              points_diff_diff,
+                              yards_diff_diff,
+                              turnover_diff_diff,
+                              pred_spread]],
+                            dtype=torch.float32)
+        print(input)
+        model = models.v1()
+        model_pred_spread = model(input).item()
+        game["home_ai_spread"] = model_pred_spread
+        game["away_ai_spread"] = model_pred_spread * -1
+            
+        
 def update_week_games(cur, week, season, local_path=None):
     """
     Scrapes internet for this weeks games and returns them.
@@ -110,7 +170,11 @@ def update_week_games(cur, week, season, local_path=None):
         if game["pts_lose"] == '': game["pts_lose"] = '0'
         game["week"] = week
 
+    # set pregame spread for the elo model
     set_pregame_spread(upcoming_games, cur)
+
+    # update ai-games
+    set_ai_pregame_spread(upcoming_games, cur)
 
     return upcoming_games
 
@@ -221,11 +285,11 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
     season_name = str(season) + "-" + str(season+1)
     season_id = cur.execute("SELECT id FROM Seasons WHERE season = ?", (season_name,)).fetchone()[0]
     week_id = cur.execute("SELECT id FROM Weeks WHERE week = ?", (week,)).fetchone()[0]
-    games = scraper.get_week_games(week, season, local_path)
+    games = update_week_games(cur, week, season, local_path)
 
     for game in games:
         #games table update
-        assign_home_away(game)
+        # assign_home_away(game)
         if game["home"] == "loser":
             game["home_team"] = game["loser"]
             game["away_team"] = game["winner"]
@@ -245,10 +309,6 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
             game["away_turnovers"] = game["to_lose"]
             game["home_turnovers"] = game["to_win"]
 
-        # game["home_pregame_elo"] = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["home_team"],)).fetchone()[0]
-        # game["away_pregame_elo"] = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["away_team"],)).fetchone()[0]            
-
-        set_pregame_spread([game], cur)
         cur.execute("""INSERT OR IGNORE INTO Games
                     (season_id, week_id, home_team, away_team,
                     home_points, away_points, home_yards,
@@ -377,24 +437,7 @@ def update_ai_input(game_id, cur):
                     WHERE Games.id = ?""", (game_id,)).fetchall()
 
     # load nn model
-    class NeuralNetwork(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.linear_relu_stack = nn.Sequential(
-                nn.Linear(5, 5),
-                nn.ReLU(),
-                nn.Linear(5, 5),
-                nn.ReLU(),
-                nn.Linear(5, 1),
-            )
-
-        def forward(self, x):
-            output = self.linear_relu_stack(x)
-            return output
-        
-    model = NeuralNetwork()
-    model.load_state_dict(torch.load('models/v1.pth'))
-    model.eval()
+    model = models.v1()
 
     # calculate averages
     games_df = pd.DataFrame(game)
