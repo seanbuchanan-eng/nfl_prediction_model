@@ -1,7 +1,7 @@
 # go through previous seasons and calcuate the elo
 
 import sqlite3
-from elo_model import postgame_elo_shift, pre_season_elo, elo_team_adjustment
+from elo_model import postgame_elo_shift, pre_season_elo, pregame_elo_shift
 
 def run():
 
@@ -37,27 +37,33 @@ def run():
                                 ( week, season) ).fetchall()
             
             for game in games:
-                home_team = game[0]
-                away_team = game[1]
-                playoffs = game[4]
-                neutral_dest = game[5]
-                game_id = game[6]
-                pregame_elo_shift = elo_team_adjustment(home_team, away_team, playoffs, neutral_dest, cur)
-                elo_shift = postgame_elo_shift(game, cur)
+                game_dict = {
+                    "home_team": game[0],
+                    "away_team": game[1],
+                    "home_points": game[2],
+                    "away_points": game[3],
+                    "playoffs": game[4],
+                    "neutral_dest": game[5],
+                    "game_id": game[6]
+                }
+                pre_elo_shift = pregame_elo_shift(game_dict, cur)
 
-                home_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (home_team,)).fetchone()[0]
-                away_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (away_team,)).fetchone()[0]
-                home_pregame_elo = home_team_elo + pregame_elo_shift
-                away_pregame_elo = away_team_elo - pregame_elo_shift            
+                home_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game_dict["home_team"],)).fetchone()[0]
+                away_team_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game_dict["away_team"],)).fetchone()[0]
+                
+                game_dict["home_pregame_elo"] = home_team_elo + pre_elo_shift
+                game_dict["away_pregame_elo"] = away_team_elo - pre_elo_shift
+
+                post_elo_shift = postgame_elo_shift(game_dict, cur)            
                 cur.execute("UPDATE Games SET home_pregame_elo = ? WHERE id = ?", 
-                            (home_pregame_elo, game_id))
+                            (game_dict["home_pregame_elo"], game_dict["game_id"]))
                 cur.execute("UPDATE Games SET away_pregame_elo = ? WHERE id = ?", 
-                            (away_pregame_elo, game_id))
+                            (game_dict["away_pregame_elo"], game_dict["game_id"]))
 
-                away_team_elo -= elo_shift
-                home_team_elo += elo_shift
-                cur.execute("UPDATE Teams SET elo = ? WHERE name = ?", (home_team_elo, home_team))
-                cur.execute("UPDATE Teams SET elo = ? WHERE name = ?", (away_team_elo, away_team))
+                away_team_elo = game_dict["away_pregame_elo"] - post_elo_shift
+                home_team_elo = game_dict["home_pregame_elo"] + post_elo_shift
+                cur.execute("UPDATE Teams SET elo = ? WHERE name = ?", (home_team_elo, game_dict["home_team"]))
+                cur.execute("UPDATE Teams SET elo = ? WHERE name = ?", (away_team_elo, game_dict["away_team"]))
 
             conn.commit()
     conn.close()

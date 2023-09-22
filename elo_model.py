@@ -33,40 +33,18 @@ def get_distance(teamA_lat, teamA_long, teamB_lat, teamB_long):
 
     return distance/1.609 # Miles
 
-def elo_team_adjustment(home_team_id, away_team_id, playoff, neutral_dest, cur):
-    """
-    Adjusts base elo rating for home field, travel distance, bye week,
-    and playoffs. Adjusts relative to the home team, therefore a negative
-    number means predicted loss by home team and visa versa.
-    
-    Parameters:
-    ----------
-    teamA: main.Team
-        Team object of the home team
-    teamB: main.Team
-        Team object of away team
-    playoff: bool
-        True or False whether it is a playoff game. Initialized to False.
-    
-    Returns:
-    --------
-    Elodiff: float
-        Difference in Elo score based on current elo score, home field, travel,
-        buy, and playoffs. Difference is relative to teamA => positive means elodiff is added
-        to teamA temporary Elo, negative means difference is added to teamB temp Elo.
-    """
-    home_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE name = ? ", 
-                                (home_team_id,)).fetchall()[0]
-    away_team = cur.execute("SELECT latitude, longitude, elo FROM Teams WHERE name = ? ", 
-                                (away_team_id,)).fetchall()[0]
-    home_team_elo = home_team[2]
-    away_team_elo = away_team[2]
+def pregame_elo_shift(game_dict, cur):
+    home_team = cur.execute("SELECT latitude, longitude FROM Teams WHERE name = ? ", 
+                                (game_dict["home_team"],)).fetchall()[0]
+    away_team = cur.execute("SELECT latitude, longitude FROM Teams WHERE name = ? ", 
+                                (game_dict["away_team"],)).fetchall()[0]
 
+    elo_shift = 0
     # travel adjustment
-    if neutral_dest != 'None':
+    if game_dict["neutral_dest"] != 'None':
         # Neutral game, make no base adjustment. Adjust both teams for distance only.
         neutral_lat, neutral_long = cur.execute("SELECT latitude, longitude FROM Teams WHERE ticker = ?", 
-                                  (neutral_dest,)).fetchall()[0]
+                                  (game_dict["neutral_dest"],)).fetchall()[0]
         home_travel_distance = get_distance(home_team[0],
                                             home_team[1],
                                             neutral_lat,
@@ -75,38 +53,25 @@ def elo_team_adjustment(home_team_id, away_team_id, playoff, neutral_dest, cur):
                                             away_team[1],
                                             neutral_lat,
                                             neutral_long)
-        home_team_elo -= round(home_travel_distance*0.004)
-        away_team_elo -= round(away_travel_distance*0.004)
+        home_team_shift = round(home_travel_distance*0.004)
+        away_team_shift = round(away_travel_distance*0.004)
+        elo_shift -= home_team_shift + away_team_shift
     else:
         distance = get_distance(home_team[0],
                                 home_team[1],
                                 away_team[0],
                                 away_team[1])
-        home_team_elo += 48
-        home_team_elo += round(distance*0.004)
+        elo_shift += 48/2
+        elo_shift += round(distance*0.004/2)
 
-    # bye adjustment (still need to implement when setting up the db)
-    # if home_team.bye:
-    #     home_team_elo += 25
-    # elif away_team.bye:
-    #     away_team_elo += 25
-    # else:
-    #     pass
-
-    # playoff adjustment
-    if playoff:
-        elo_diff = (home_team_elo - away_team_elo)*1.2
-    else:
-        elo_diff = (home_team_elo - away_team_elo)
-
-    return round(elo_diff)
+    return elo_shift
 
 def win_prob(elo_diff):
     "Calculates win probability with respect to the home team"
     win_probability = 1/(10**(-elo_diff/400)+1)
     return win_probability
 
-def postgame_elo_shift(game, cur, elo_diff=None):
+def postgame_elo_shift(game_dict, cur):
     """
     Calculates the points to be added or subtracted to the home team.
     The opposite must be done to the away team.
@@ -131,14 +96,17 @@ def postgame_elo_shift(game, cur, elo_diff=None):
         based on the game result. Positive indicates points go to teamA, negative
         indicates points go to teamB.
     """
-    home_points = game[2]
-    away_points = game[3]
+    home_points = int(game_dict["home_points"])
+    away_points = int(game_dict["away_points"])
 
     # recommended K-factor
     K = 20 
     
-    if not elo_diff:
-        elo_diff = elo_team_adjustment(game[0], game[1], game[4], game[5], cur) # calcs wrt home team
+    # elo_diff = elo_team_adjustment(game_dict, cur) # calcs wrt home team
+    if game_dict["playoffs"]:
+        elo_diff = (game_dict["home_pregame_elo"] - game_dict["away_pregame_elo"])*1.2
+    else:
+        elo_diff = game_dict["home_pregame_elo"] - game_dict["away_pregame_elo"]
         
     # forcast delta
     win_probability = win_prob(elo_diff)
