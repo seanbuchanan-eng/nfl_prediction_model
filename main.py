@@ -103,20 +103,20 @@ def serve_past_games():
         WEEK += 1
         UPCOMING_GAMES = upcoming_games.update_week_games(cur,
                                                           WEEK,
-                                                          SEASON,
-                                                          local_path='test_page.html')
+                                                          SEASON)#,
+                                                        #   local_path='test_page.html')
 
     now = datetime.now(timezone('EST'))
     last_game_date = upcoming_games.calc_last_game_date(UPCOMING_GAMES)
 
     while now.date() > last_game_date:
-        upcoming_games.move_prev_week_to_db(cur, conn, WEEK, SEASON, local_path='test_page.html')
+        upcoming_games.move_prev_week_to_db(cur, conn, WEEK, SEASON)#, local_path='test_page.html')
         
         WEEK += 1
         UPCOMING_GAMES = upcoming_games.update_week_games(cur,
                                                           WEEK,
-                                                          SEASON,
-                                                          local_path='test_page.html')
+                                                          SEASON)#,
+                                                        #   local_path='test_page.html')
         last_game_date = upcoming_games.calc_last_game_date(UPCOMING_GAMES)
 
     return json.dumps(UPCOMING_GAMES)
