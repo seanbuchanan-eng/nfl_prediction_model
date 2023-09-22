@@ -141,7 +141,6 @@ def set_ai_pregame_spread(games, cur):
                               turnover_diff_diff,
                               pred_spread]],
                             dtype=torch.float32)
-        print(input)
         model = models.v1()
         model_pred_spread = model(input).item()
         game["home_ai_spread"] = model_pred_spread
