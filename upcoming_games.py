@@ -1,6 +1,9 @@
 import elo_model
 import scraper
 from datetime import date
+import pandas as pd
+import torch
+from torch import nn
 
 def calc_last_game_date(games):
     """
@@ -59,25 +62,26 @@ def set_pregame_spread(games, cur):
     """
     Sets pregame spread for upcoming games.
     """
-    neutral_dest = 'None'
     for game in games:
         assign_home_away(game)
         if game["home"] == "loser":
-            home_team = game["loser"]
-            away_team = game["winner"]
+            game["home_team"] = game["loser"]
+            game["away_team"] = game["winner"]
         else:
-            home_team = game["winner"]
-            away_team = game["loser"]
+            game["home_team"] = game["winner"]
+            game["away_team"] = game["loser"]
 
-        home_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (home_team,)).fetchone()[0]
-        away_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (away_team,)).fetchone()[0]
+        home_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["home_team"],)).fetchone()[0]
+        away_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["away_team"],)).fetchone()[0]
 
         # TODO account for playoffs and implement neutral dest
-        pregame_elo_shift = elo_model.elo_team_adjustment(home_team, away_team, False, neutral_dest, cur)
+        game["neutral_dest"] = 'None'
+        game["playoffs"] = False
+        pregame_elo_shift = elo_model.pregame_elo_shift(game, cur)
         home_elo = home_elo + pregame_elo_shift
         away_elo = away_elo - pregame_elo_shift
-        game["home_elo"] = home_elo
-        game["away_elo"] = away_elo
+        game["home_pregame_elo"] = home_elo
+        game["away_pregame_elo"] = away_elo
 
         home_spread = (away_elo - home_elo)/25
         away_spread = home_spread * -1
@@ -110,6 +114,97 @@ def update_week_games(cur, week, season, local_path=None):
 
     return upcoming_games
 
+def update_inference_data(game, game_id, week, cur):
+    update_string = build_inference_update_string("InferenceData", game_id, 14)
+
+    home_ai_data = cur.execute("""SELECT TeamAiData.* 
+                                FROM TeamAiData JOIN Teams on TeamAiData.team_id = Teams.id
+                                WHERE Teams.name = ?""", (game["home_team"],)).fetchall()[0]
+    away_ai_data = cur.execute("""SELECT TeamAiData.* 
+                                FROM TeamAiData JOIN Teams on TeamAiData.team_id = Teams.id
+                                WHERE Teams.name = ?""", (game["away_team"],)).fetchall()[0]
+
+    if home_ai_data[2] == 1:
+        home_elo_for = list(home_ai_data[4:18])
+        home_elo_against = list(home_ai_data[18:32])
+        home_points_for = list(home_ai_data[32:46])
+        home_points_against = list(home_ai_data[46:60])
+        home_yards_for = list(home_ai_data[60:74])
+        home_yards_against = list(home_ai_data[74:88])
+        home_turnovers_for = list(home_ai_data[88:102])
+        home_turnovers_against = list(home_ai_data[102:116])
+    else:
+        home_elo_for = list(home_ai_data[117:131])
+        home_elo_against = list(home_ai_data[131:145])
+        home_points_for = list(home_ai_data[145:159])
+        home_points_against = list(home_ai_data[159:173])
+        home_yards_for = list(home_ai_data[173:187])
+        home_yards_against = list(home_ai_data[187:201])
+        home_turnovers_for = list(home_ai_data[201:215])
+        home_turnovers_against = list(home_ai_data[215:229])
+    if away_ai_data[2] == 1:
+        away_elo_for = list(away_ai_data[4:18])
+        away_elo_against = list(away_ai_data[18:32])
+        away_points_for = list(away_ai_data[32:46])
+        away_points_against = list(away_ai_data[46:60])
+        away_yards_for = list(away_ai_data[60:74])
+        away_yards_against = list(away_ai_data[74:88])
+        away_turnovers_for = list(away_ai_data[88:102])
+        away_turnovers_against = list(away_ai_data[102:116])
+    else:
+        away_elo_for = list(away_ai_data[117:131])
+        away_elo_against = list(away_ai_data[131:145])
+        away_points_for = list(away_ai_data[145:159])
+        away_points_against = list(away_ai_data[159:173])
+        away_yards_for = list(away_ai_data[173:187])
+        away_yards_against = list(away_ai_data[187:201])
+        away_turnovers_for = list(away_ai_data[201:215])
+        away_turnovers_against = list(away_ai_data[215:229])
+
+    cur.execute(update_string, (game_id, game["home_pregame_elo"],
+                                *home_elo_for, *home_elo_against,
+                                *home_points_for, *home_points_against,
+                                *home_yards_for, *home_yards_against,
+                                *home_turnovers_for, *home_turnovers_against,
+                                game["away_pregame_elo"], *away_elo_for,
+                                *away_elo_against, *away_points_for,
+                                *away_points_against, *away_yards_for,
+                                *away_yards_against, *away_turnovers_for,
+                                *away_turnovers_against, week))
+        
+def build_inference_update_string(table_name, game_id, number):
+    update_string = f"""INSERT OR IGNORE INTO {table_name}
+                        (game_id, home_pregame_elo"""
+    
+    items = {}
+    items["home_elo_for"] = number
+    items["home_elo_against"] = number
+    items["home_points_for"] = number
+    items["home_points_against"] = number
+    items["home_yards_for"] = number
+    items["home_yards_against"] = number
+    items["home_turnovers_for"] = number
+    items["home_turnovers_against"] = number
+    items["away_pregame_elo"] = 0
+    items["away_elo_for"] = number
+    items["away_elo_against"] = number
+    items["away_points_for"] = number
+    items["away_points_against"] = number
+    items["away_yards_for"] = number
+    items["away_yards_against"] = number
+    items["away_turnovers_for"] = number
+    items["away_turnovers_against"] = number
+    for name, number in items.items():
+        if name == "away_pregame_elo":
+            update_string += f", {name}"
+        for idx in range(1, number+1):
+            update_string += f", {name}_{idx}"
+    update_string += f", week_number) VALUES (?"
+    for idx in range(0,227):
+        update_string += ", ?"
+    update_string += ")"
+    return update_string
+
 def move_prev_week_to_db(cur, conn, week, season, local_path=None):
     """
     Scrapes the internet to get the scores from the previous week
@@ -132,27 +227,28 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
         #games table update
         assign_home_away(game)
         if game["home"] == "loser":
-            home_team = game["loser"]
-            away_team = game["winner"]
-            home_points = game["pts_lose"]
-            away_points = game["pts_win"]
-            home_yards = game["yards_lose"]
-            away_yards = game["yards_win"]
-            home_turnovers = game["to_lose"]
-            away_turnovers = game["to_win"]
+            game["home_team"] = game["loser"]
+            game["away_team"] = game["winner"]
+            game["home_points"] = game["pts_lose"]
+            game["away_points"] = game["pts_win"]
+            game["home_yards"] = game["yards_lose"]
+            game["away_yards"] = game["yards_win"]
+            game["home_turnovers"] = game["to_lose"]
+            game["away_turnovers"] = game["to_win"]
         else:
-            away_team = game["loser"]
-            home_team = game["winner"]
-            away_points = game["pts_lose"]
-            home_points = game["pts_win"]
-            away_yards = game["yards_lose"]
-            home_yards = game["yards_win"]
-            away_turnovers = game["to_lose"]
-            home_turnovers = game["to_win"]
+            game["away_team"] = game["loser"]
+            game["home_team"] = game["winner"]
+            game["away_points"] = game["pts_lose"]
+            game["home_points"] = game["pts_win"]
+            game["away_yards"] = game["yards_lose"]
+            game["home_yards"] = game["yards_win"]
+            game["away_turnovers"] = game["to_lose"]
+            game["home_turnovers"] = game["to_win"]
 
-        home_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (home_team,)).fetchone()[0]
-        away_elo = cur.execute("SELECT elo FROM Teams WHERE name = ?", (away_team,)).fetchone()[0]            
+        # game["home_pregame_elo"] = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["home_team"],)).fetchone()[0]
+        # game["away_pregame_elo"] = cur.execute("SELECT elo FROM Teams WHERE name = ?", (game["away_team"],)).fetchone()[0]            
 
+        set_pregame_spread([game], cur)
         cur.execute("""INSERT OR IGNORE INTO Games
                     (season_id, week_id, home_team, away_team,
                     home_points, away_points, home_yards,
@@ -160,21 +256,176 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
                     home_pregame_elo, away_pregame_elo, playoffs,
                     home_bye, away_bye, neutral_destination) 
                     VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (season_id, week_id, home_team, away_team, home_points,
-                     away_points, home_yards, away_yards, home_turnovers,
-                     away_turnovers, home_elo, away_elo, 0, 0, 0, 'None'))
+                    (season_id, week_id, game["home_team"], game["away_team"], game["home_points"],
+                     game["away_points"], game["home_yards"], game["away_yards"], game["home_turnovers"],
+                     game["away_turnovers"], game["home_pregame_elo"], game["away_pregame_elo"], 0, 0, 0, 'None'))
         
+        game_id = cur.execute("SELECT last_insert_rowid()").fetchone()[0]
+
         # team elo update
-        elo_diff = int(home_elo) - int(away_elo)
-        elo_shift = elo_model.postgame_elo_shift(
-            (None, None, int(home_points), int(away_points)),
-            cur,
-            elo_diff
-            )
-        away_elo -= elo_shift
-        home_elo += elo_shift
+        elo_shift = elo_model.postgame_elo_shift(game, cur)
+        away_elo = game["away_pregame_elo"] - elo_shift
+        home_elo = game["home_pregame_elo"] + elo_shift
         cur.execute("UPDATE Teams SET elo = ? WHERE name = ?",
-                    (home_elo, home_team))
+                    (home_elo, game["home_team"]))
         cur.execute("UPDATE Teams SET elo = ? WHERE name = ?",
-                    (away_elo, away_team))
+                    (away_elo, game["away_team"]))
+        
+        update_inference_data(game, game_id, week, cur)
+        update_ai_input(game_id, cur)
+        
+        update_ai_data(game["home_team"], 1, game, week, cur)
+        update_ai_data(game["away_team"], 0, game, week, cur)
+
     conn.commit()
+
+def update_ai_data(team, home, game, week, cur):
+    ai_data = cur.execute("""SELECT TeamAiData.* 
+                            FROM TeamAiData JOIN Teams on TeamAiData.team_id = Teams.id
+                            WHERE Teams.name = ?""", (team,)).fetchall()[0]
+    home_team = 1
+    # get the last 13 of 14 attribute columns
+    home_elo_for = list(ai_data[5:18])
+    home_elo_against = list(ai_data[19:32])
+    home_points_for = list(ai_data[33:46])
+    home_points_against = list(ai_data[47:60])
+    home_yards_for = list(ai_data[61:74])
+    home_yards_against = list(ai_data[75:88])
+    home_turnovers_for = list(ai_data[89:102])
+    home_turnovers_against = list(ai_data[103:116])
+    away_elo_for = list(ai_data[118:131])
+    away_elo_against = list(ai_data[132:145])
+    away_points_for = list(ai_data[146:159])
+    away_points_against = list(ai_data[160:173])
+    away_yards_for = list(ai_data[174:187])
+    away_yards_against = list(ai_data[188:201])
+    away_turnovers_for = list(ai_data[202:215])
+    away_turnovers_against = list(ai_data[216:229])
+    team_id = ai_data[1]
+
+    # get command for updating the db
+    update_string = build_aidata_update_string("TeamAiData", team_id, 14)
+
+    # add the recent game stats to the existing ones
+    home_elo_for.append(game["home_pregame_elo"])
+    home_elo_against.append(game["away_pregame_elo"])
+    home_points_for.append(game["home_points"])
+    home_points_against.append(game["away_points"])
+    home_yards_for.append(game["home_yards"])
+    home_yards_against.append(game["away_yards"])
+    home_turnovers_for.append(game["away_turnovers"])
+    home_turnovers_against.append(game["home_turnovers"])
+    away_elo_for.append(game["away_pregame_elo"])
+    away_elo_against.append(game["home_pregame_elo"])
+    away_points_for.append(game["away_points"])
+    away_points_against.append(game["home_points"])
+    away_yards_for.append(game["away_yards"])
+    away_yards_against.append(game["home_yards"])
+    away_turnovers_for.append(game["home_turnovers"])
+    away_turnovers_against.append(game["away_turnovers"])
+
+    if home: home_team = 1
+    else: home_team = 0
+
+    cur.execute(update_string, (home_team, game["home_pregame_elo"],
+                                *home_elo_for, *home_elo_against,
+                                *home_points_for, *home_points_against,
+                                *home_yards_for, *home_yards_against,
+                                *home_turnovers_for, *home_turnovers_against,
+                                game["away_pregame_elo"], *away_elo_for,
+                                *away_elo_against, *away_points_for,
+                                *away_points_against, *away_yards_for,
+                                *away_yards_against, *away_turnovers_for,
+                                *away_turnovers_against, week))
+    
+
+def build_aidata_update_string(table_name, team_id, number):
+    update_string = f"""UPDATE {table_name} SET
+                        team_id = {team_id}, home_team = ?, home_pregame_elo = ?"""
+    
+    items = {}
+    items["home_elo_for"] = number
+    items["home_elo_against"] = number
+    items["home_points_for"] = number
+    items["home_points_against"] = number
+    items["home_yards_for"] = number
+    items["home_yards_against"] = number
+    items["home_turnovers_for"] = number
+    items["home_turnovers_against"] = number
+    items["away_pregame_elo"] = 0
+    items["away_elo_for"] = number
+    items["away_elo_against"] = number
+    items["away_points_for"] = number
+    items["away_points_against"] = number
+    items["away_yards_for"] = number
+    items["away_yards_against"] = number
+    items["away_turnovers_for"] = number
+    items["away_turnovers_against"] = number
+    for name, number in items.items():
+        if name == "away_pregame_elo":
+            update_string += f", {name} = ?"
+        for idx in range(1, number+1):
+            update_string += f", {name}_{idx} = ?"
+    update_string += f", week_number = ? WHERE team_id = {team_id}"
+    return update_string
+
+def update_ai_input(game_id, cur):
+    game = cur.execute("""
+                    SELECT Games.id, Games.home_points, Games.away_points,
+                    Games.home_pregame_elo, Games.away_pregame_elo, InferenceData.*
+                    FROM Games JOIN InferenceData on Games.id = InferenceData.game_id
+                    WHERE Games.id = ?""", (game_id,)).fetchall()
+
+    # load nn model
+    class NeuralNetwork(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear_relu_stack = nn.Sequential(
+                nn.Linear(5, 5),
+                nn.ReLU(),
+                nn.Linear(5, 5),
+                nn.ReLU(),
+                nn.Linear(5, 1),
+            )
+
+        def forward(self, x):
+            output = self.linear_relu_stack(x)
+            return output
+        
+    model = NeuralNetwork()
+    model.load_state_dict(torch.load('models/v1.pth'))
+    model.eval()
+
+    # calculate averages
+    games_df = pd.DataFrame(game)
+
+    games_df["home_point_diff"] = games_df.iloc[:,36:50].mean(axis=1) - games_df.iloc[:,50:64].mean(axis=1)
+    games_df["away_point_diff"] = games_df.iloc[:,149:163].mean(axis=1) - games_df.iloc[:,163:177].mean(axis=1)
+    games_df["point_diff_diff"] = games_df["home_point_diff"] - games_df["away_point_diff"]
+    games_df["home_turnover_diff"] = games_df.iloc[:,92:106].mean(axis=1) - games_df.iloc[:,106:120].mean(axis=1)
+    games_df["away_turnover_diff"] = games_df.iloc[:,205:219].mean(axis=1) - games_df.iloc[:,219:233].mean(axis=1)
+    games_df["turnover_diff_diff"] = games_df["home_turnover_diff"] - games_df["away_turnover_diff"]
+    games_df["home_yard_diff"] = games_df.iloc[:,64:78].mean(axis=1) - games_df.iloc[:,78:92].mean(axis=1)
+    games_df["away_yard_diff"] = games_df.iloc[:,177:191].mean(axis=1) - games_df.iloc[:,191:205].mean(axis=1)
+    games_df["yard_diff_diff"] = games_df["home_yard_diff"] - games_df["away_yard_diff"]
+    games_df["home_elo_diff"] = games_df.iloc[:,8:22].mean(axis=1) - games_df.iloc[:,22:36].mean(axis=1)
+    games_df["away_elo_diff"] = games_df.iloc[:,121:135].mean(axis=1) - games_df.iloc[:,135:149].mean(axis=1)
+    games_df["elo_diff_diff"] = games_df["home_elo_diff"] - games_df["away_elo_diff"]
+    games_df["pred_spread"] = (games_df.iloc[:, 4] - games_df.iloc[:, 3])/25
+
+    # populate table
+    input = torch.tensor(games_df[["elo_diff_diff",
+                            "point_diff_diff",
+                            "yard_diff_diff",
+                            "turnover_diff_diff",
+                            "pred_spread"]].to_numpy(dtype=float),
+                            dtype=torch.float32)
+    model_pred = model(input).item()
+    cur.execute("""INSERT OR IGNORE INTO AiInput 
+                (game_id, ai_spread, elo_diff, point_diff,
+                yard_diff, turnover_diff, elo_pred_spread) Values
+                (?, ?, ?, ?, ?, ?, ?)""",
+                (game_id, model_pred, games_df["elo_diff_diff"].to_numpy()[0],
+                games_df["point_diff_diff"].to_numpy()[0], games_df["yard_diff_diff"].to_numpy()[0],
+                games_df["turnover_diff_diff"].to_numpy()[0], games_df["pred_spread"].to_numpy()[0])
+                )
