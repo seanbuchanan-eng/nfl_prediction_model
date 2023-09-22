@@ -14,17 +14,13 @@ async function populateDropdowns() {
     }
 
     let weekHTML = ``;
-    let weeks = [...Array(18).keys(), "WildCard", "Division", "ConfChamp", "SuperBowl"];
+    let week = [...Array(18).keys()].map(x => ++x);
+    let weeks = [...week, "WildCard", "Division", "ConfChamp", "SuperBowl"];
     console.log(weeks);
     for (const week of weeks.values()) {
-        if (week <= 2) { 
-            weekHTML += `<option value=${week+1}>${week+1}</option>`;
-        }
-        else {
-            weekHTML += `<option value=${week}>${week}</option>`;
-        }
-        
+        weekHTML += `<option value=${week}>${week}</option>`; 
     }
+
     console.log("dropdown populated");
     seasonsDropdown.innerHTML = seasonHTML;
     weeksDropdown.innerHTML = weekHTML;

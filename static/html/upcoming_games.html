@@ -20,6 +20,16 @@
         <h1 class="title_header">UPCOMING GAMES</h1>
         <p>See predicted spreads for every upcoming week of the season.</p>
         <h1 id="week_header"></h1>
+        <div class="radio_container">
+            <div>
+            <label for="elo_button">Elo Model</label>
+            <input type="radio" id="elo_button" name="model_button" value="Elo Model" checked="checked" onclick="updateGames()">
+            </div>
+            <div>
+            <label for="ai_button">AI-Enhanced Elo Model</label>
+            <input type="radio" id="ai_button" name="model_button" value="AI-Enhanced Elo Model" onclick="updateGames()">
+            </div>
+        </div>
         <section class="game_cards" id="game_cards"></section>
     </main>
     <footer>NFL Prediction</footer>

@@ -1,5 +1,6 @@
 const weeksHeader = document.getElementById("week_header");
 const gameCards = document.getElementById("game_cards");
+const radioButtons = document.getElementsByName("model_button");
 
 
 async function updateGames() {
@@ -19,13 +20,25 @@ async function updateGames() {
             homePoints = game["pts_lose"]
             awayPoints = game["pts_win"]
         }
-        if (game["home_spread"] <= 0) {
-            homeSpread = "- " + Math.abs(game["home_spread"]).toFixed(1)
-            awaySpread = "+" + Math.abs(game["away_spread"]).toFixed(1)
+
+        if (radioButtons[0].checked){
+            if (game["home_spread"] <= 0) {
+                homeSpread = "- " + Math.abs(game["home_spread"]).toFixed(1)
+                awaySpread = "+" + Math.abs(game["away_spread"]).toFixed(1)
+            } else {
+                homeSpread = "+" + Math.abs(game["home_spread"]).toFixed(1)
+                awaySpread = "- " + Math.abs(game["away_spread"]).toFixed(1)
+            }
         } else {
-            homeSpread = "+" + Math.abs(game["home_spread"]).toFixed(1)
-            awaySpread = "- " + Math.abs(game["away_spread"]).toFixed(1)
-        }
+            if (game["home_ai_spread"] <= 0) {
+                homeSpread = "- " + Math.abs(game["home_ai_spread"]).toFixed(1)
+                awaySpread = "+" + Math.abs(game["away_ai_spread"]).toFixed(1)
+            } else {
+                homeSpread = "+" + Math.abs(game["home_ai_spread"]).toFixed(1)
+                awaySpread = "- " + Math.abs(game["away_ai_spread"]).toFixed(1)
+            }
+        } 
+        
         cardHTML += `<div class="game_card">
                         <div class="card_container">
                             <h4 class="team_name1"><b>${homeTeam}</b></h4>
