@@ -4,3 +4,6 @@ db.sqlite-journal
 ~*
 ai_model_notes.docx
 scratchpad.txt
+test_page.html
+models/test_run1.pth
+db.sqlite
