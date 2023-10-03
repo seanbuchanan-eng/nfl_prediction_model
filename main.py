@@ -1,9 +1,7 @@
 import os
 import sqlite3
 import json
-import scraper
 import elo_sim
-import elo_model
 import init_db
 import process_train_test_data
 import process_inference_data
@@ -129,5 +127,5 @@ def get_team(name):
 
 if __name__ == '__main__':
     setup()
-    app.run(debug=True)
+    app.run(debug=False)
     conn.close()
