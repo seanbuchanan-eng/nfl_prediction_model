@@ -1,4 +1,9 @@
-import os
+"""
+This script creates and populates the MLData table in the database.
+
+The data from the MLData table is used for training and testing the 
+neural network used for improving the Elo model spread predictions.
+"""
 import sqlite3
 import init_db
 import elo_sim

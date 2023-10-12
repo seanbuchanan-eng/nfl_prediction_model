@@ -1,20 +1,25 @@
-import numpy as np
-
 """
-Elo model developed by Jay Boice at FiveThirtyEight.
+This module contains all of the functions for implementing the 
+Elo Model developed by Jay Boice at FiveThirtyEight.
 see https://fivethirtyeight.com/methodology/how-our-nfl-predictions-work/
 """
 
+import numpy as np
+
 def get_distance(teamA_lat, teamA_long, teamB_lat, teamB_long):
     """
-    Calculates distance between teams using haversine formula.
+    Calculates distance between team home locations using haversine formula.
     
     Parameters
     ----------
-    teamA: main.Team
-        Team object of in game team
-    teamB: main.Team
-        Team object of other in game team
+    teamA_lat : float
+        Team A latitude
+    teamA_long : float
+        Team A longitude
+    teamB_lat : float
+        Team B latitude
+    teamB_long : float
+        Team B longitude
     
     Returns:
     --------
@@ -34,6 +39,26 @@ def get_distance(teamA_lat, teamA_long, teamB_lat, teamB_long):
     return distance/1.609 # Miles
 
 def pregame_elo_shift(game_dict, cur):
+    """
+    Calculate the pregame elo shift for a given game.
+
+    Parameters
+    ----------
+    game_dict : dict[str: any]
+        Dictionary of game data.
+        e.g. {"home_team": team name,
+              "away_team": team name,
+              "neutral_dest": team ticker of home destination
+              }
+    cur : sqlite db cursor
+        Cursor for the current instance of sqlite database.
+
+    Returns
+    -------
+        Amount of elo that needs to be shifted from the away team to the 
+        home team. For example, add elo_shift to the home team and subtract 
+        from the away team.
+    """
     home_team = cur.execute("SELECT latitude, longitude FROM Teams WHERE name = ? ", 
                                 (game_dict["home_team"],)).fetchall()[0]
     away_team = cur.execute("SELECT latitude, longitude FROM Teams WHERE name = ? ", 
@@ -73,28 +98,27 @@ def win_prob(elo_diff):
 
 def postgame_elo_shift(game_dict, cur):
     """
-    Calculates the points to be added or subtracted to the home team.
-    The opposite must be done to the away team.
+    Calculates the points to be added or subtracted to the home team
+    based on the game results. The opposite must be done to the away team.
 
     Parameters:
     -----------
-    teamA: main.Team
-        One of the teams playing
-    teamB: main.Team
-        The other team playing
-    result: float
-        All results are with respect to TeamA 1-win, 0-loss, 0.5-tie.
-    pointdiff: float
-        Point differential (positive)
-    playoff: bool
-        True if playoffs False otherwise (optional)
+    game_dict: dict[str: any]
+        Dictionary containing game data.
+        e.g. {
+            "home_points": home team points,
+            "away_points": away team points,
+            "playoffs": True if a playoff game else False,
+            "home_pregame_elo": home pregame elo score,
+            "away_pregame_elo": away pregame elo score,
+        }
 
     Returns:
     --------
     Elo Shift: float
-        The number of Elo points that need to be shifted from teamA to teamB
-        based on the game result. Positive indicates points go to teamA, negative
-        indicates points go to teamB.
+        The number of Elo points that need to be shifted from the away team 
+        to the home team based on the game result. Positive indicates points 
+        go to the home team, negative indicates points go to the away team.
     """
     home_points = int(game_dict["home_points"])
     away_points = int(game_dict["away_points"])
@@ -122,7 +146,7 @@ def postgame_elo_shift(game_dict, cur):
     
     if point_diff == 0:
         # The explanation for accounting for a tie doesn't seem to be on the website
-        # anymore but I've decided to keep this value it because it makes sense 
+        # anymore but I've decided to keep this value because it makes sense 
         # that a team that is predicted to win ties should lose points.
         mov = 1.525
     else:
@@ -139,13 +163,13 @@ def pre_season_elo(elo):
     
     Parameters:
     -----------
-    team: main.Team
-        team calculate pre-season elo from.
+    elo : int
+        Elo of a team at the end of a season.
 
     Returns:
     --------
     int
-        New elo value for team.
+        New elo value for the team.
     """
     mean = 1505
     new_elo = elo - (elo - mean)/3

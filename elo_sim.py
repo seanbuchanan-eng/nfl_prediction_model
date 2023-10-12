@@ -1,4 +1,8 @@
-# go through previous seasons and calcuate the elo
+"""
+This script simulates previous seasons by calculating the Elo score for every game
+that has been played since 2010. Stores the resulting pregame elo 
+prediction in the Games table in the database.
+"""
 
 import sqlite3
 from elo_model import postgame_elo_shift, pre_season_elo, pregame_elo_shift

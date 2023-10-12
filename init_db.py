@@ -1,3 +1,10 @@
+"""
+This table initializes the database with data from seasons 2010 to 2022.
+
+The resulting database contains the core elements of the website data with
+Seasons, Teams, Games, and Weeks, tables. 
+"""
+
 import os
 import sqlite3
 

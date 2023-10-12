@@ -12,11 +12,13 @@ def calc_last_game_date(games):
     
     Parameters
     ----------
-    games: dictionary of games for a week.
+    games : dict
+        Dictionary of games for a week.
 
     Returns
     -------
-    Last date of a game as a date object.
+    Date object    
+        Date of last game in games as a date object.
     """
     last_game_date = games[-2]['game_date'].split('-')
     last_game_date = date(int(last_game_date[0]), 
@@ -25,6 +27,15 @@ def calc_last_game_date(games):
     return last_game_date
 
 def add_season_to_db(cur, conn):
+    """
+    Update the Seasons table in the database to include
+    the most recent season + 1.
+
+    Parameters
+    ----------
+    cur : sqlite cursor object
+    conn : sqlite connection object
+    """
     last_season = cur.execute("SELECT * FROM Seasons").fetchall()[-1]
     year = last_season[1].split("-")
     next_year = year[1] + "-" + str(int(year[1])+1)
@@ -39,8 +50,8 @@ def update_pre_season_elo(cur, conn):
 
     Parameters
     ----------
-    cur: database cursor
-    conn: database connection
+    cur : sqlite cursor object
+    conn : sqlite connection object
     """
     teams = cur.execute("SELECT id, elo FROM Teams").fetchall()
     for team in teams:
@@ -51,6 +62,11 @@ def update_pre_season_elo(cur, conn):
 def assign_home_away(game):
     """
     Assign the home and away team to `game`.
+
+    Parameters
+    ----------
+    game : dict
+        Dictionary of game data.
     """
     if game["game_location"] == '@' or game["game_location"] == 'N':
         game["home"] = "loser"
@@ -61,7 +77,14 @@ def assign_home_away(game):
 
 def set_pregame_spread(games, cur):
     """
-    Sets pregame spread for upcoming games.
+    Sets pregame spread for upcoming games and add it to
+    games as another key entry.
+
+    Parameters
+    ----------
+    games : list[dict]
+        List of dictionaries with game data.
+    cur : sqlite cursor object
     """
     for game in games:
         assign_home_away(game)
@@ -90,9 +113,19 @@ def set_pregame_spread(games, cur):
         game["away_spread"] = away_spread
 
 def set_ai_pregame_spread(games, cur):
+    """
+    Calculates the AI predicted spread and adds it to
+    `games` with keys "home_ai_spread" and "away_ai_spread".
+
+    Parameters
+    ----------
+    games : list[dict]
+        List of dictionaries with game data.
+    cur : sqlite cursor object
+    """
     
     for game in games:
-        # ensure that home_team has been 
+        # ensure that home_team has been identified
         try:
             game["home_team"]
             game["away_team"]
@@ -149,17 +182,22 @@ def set_ai_pregame_spread(games, cur):
         
 def update_week_games(cur, week, season, local_path=None):
     """
-    Scrapes internet for this weeks games and returns them.
+    Scrapes internet for this weeks games and then updates
+    the games with predicted Elo spreads and AI spreads.
 
     Parameters
     ----------
-    week: current week of the season
-    season: current season
-    local_path: local path to an html file for debugging
+    week : int 
+        Current week of the season.
+    season : int
+        Current season. Would be 2023 for 2023-2024 season.
+    local_path : str
+        Local path to an html file for debugging.
 
     Returns
     -------
-    dict: upcoming games and their parameters for the week.
+    dict
+        Upcoming games and their predictions for the week.
     """
     #scrape for upcoming games
     upcoming_games = scraper.get_week_games(week, season, local_path)
@@ -178,6 +216,19 @@ def update_week_games(cur, week, season, local_path=None):
     return upcoming_games
 
 def update_inference_data(game, game_id, week, cur):
+    """
+    Updates the InferenceData table in the db with new game data.
+
+    Parameters
+    ----------
+    game : dict
+        Dictionary with game data.
+    game_id : int
+        Id of the game in the database.
+    week : int
+        Week of the season that the game occurs in.
+    cur : sqlite database cursor
+    """
     update_string = build_inference_update_string("InferenceData", game_id, 14)
 
     home_ai_data = cur.execute("""SELECT TeamAiData.* 
@@ -236,6 +287,25 @@ def update_inference_data(game, game_id, week, cur):
                                 *away_turnovers_against, week))
         
 def build_inference_update_string(table_name, game_id, number):
+    """
+    Builds the INSERT string for updating all columns of the `table_name`
+    table in the database.
+
+    Parameters
+    ----------
+    table_name : str
+        Name of the table.
+    game_id : int
+        Id of the game in the database.
+    number : int
+        Number of games that are included in the backwards averaging
+        for the ML model. Currently 14.
+
+    Returns
+    -------
+    str
+        INSERT string for updating the `table_name` table in the database.
+    """
     update_string = f"""INSERT OR IGNORE INTO {table_name}
                         (game_id, home_pregame_elo"""
     
@@ -271,15 +341,18 @@ def build_inference_update_string(table_name, game_id, number):
 def move_prev_week_to_db(cur, conn, week, season, local_path=None):
     """
     Scrapes the internet to get the scores from the previous week
-    and adds them to the past games table in the db. Also updates
+    and adds the data to the db. Also updates
     the elo scores of the teams who played that week.
 
     Parameters
     ----------
-    cur: database cursor
-    week: current week of the season
-    season: current season
-    local_path: local path to an html file for debugging
+    cur : database cursor
+    week : int
+        Current week of the season
+    season : int
+        Current season. Would be 2023 for 2023-2024 season.
+    local_path : str
+        Local path to an html file for debugging.
     """
     season_name = str(season) + "-" + str(season+1)
     season_id = cur.execute("SELECT id FROM Seasons WHERE season = ?", (season_name,)).fetchone()[0]
@@ -339,6 +412,23 @@ def move_prev_week_to_db(cur, conn, week, season, local_path=None):
     conn.commit()
 
 def update_ai_data(team, home, game, week, cur):
+    """
+    Updates the TeamAiData table in the database. 
+    NOTE: Commit must be made after the function returns.
+
+    Parameters
+    ----------
+    team : str
+        Name of the team whose data is to be updated.
+    home : bool
+        True if `team` was the hometeam in the most recent game.
+        Else false.
+    game : dict
+        Dictionary with game data.
+    week : int
+        Week that the game was played in.
+    cur : sqlite cursor object 
+    """
     ai_data = cur.execute("""SELECT TeamAiData.* 
                             FROM TeamAiData JOIN Teams on TeamAiData.team_id = Teams.id
                             WHERE Teams.name = ?""", (team,)).fetchall()[0]
@@ -399,6 +489,25 @@ def update_ai_data(team, home, game, week, cur):
     
 
 def build_aidata_update_string(table_name, team_id, number):
+    """
+    Builds the INSERT string for updating all columns of the `table_name`
+    table in the database.
+
+    Parameters
+    ----------
+    table_name : str
+        Name of the table.
+    team_id : int
+        Id of the team in the database.
+    number : int
+        Number of games that are included in the backwards averaging
+        for the ML model. Currently 14.
+
+    Returns
+    -------
+    str
+        INSERT string for updating the `table_name` table in the database.
+    """
     update_string = f"""UPDATE {table_name} SET
                         team_id = {team_id}, home_team = ?, home_pregame_elo = ?"""
     
@@ -429,6 +538,16 @@ def build_aidata_update_string(table_name, team_id, number):
     return update_string
 
 def update_ai_input(game_id, cur):
+    """
+    Copies new data from the Games and InferenceData tables to
+    the AiInput table in the database.
+
+    Parameters
+    ----------
+    game_id : int
+        Id of the game to have data copied.
+    cur : sqlite cursor object.
+    """
     game = cur.execute("""
                     SELECT Games.id, Games.home_points, Games.away_points,
                     Games.home_pregame_elo, Games.away_pregame_elo, InferenceData.*

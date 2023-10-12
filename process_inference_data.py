@@ -1,4 +1,10 @@
-import os
+"""
+Create and populate InferenceData table in database for the neural network data.
+
+The input data for the model is derived from this table further downstream
+in the pipeline.
+"""
+
 import pandas as pd
 import sqlite3
 import models
