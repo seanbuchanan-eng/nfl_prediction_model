@@ -55,6 +55,7 @@ def pregame_elo_shift(game_dict, cur):
 
     Returns
     -------
+    int
         Amount of elo that needs to be shifted from the away team to the 
         home team. For example, add elo_shift to the home team and subtract 
         from the away team.
@@ -115,7 +116,7 @@ def postgame_elo_shift(game_dict, cur):
 
     Returns:
     --------
-    Elo Shift: float
+    int
         The number of Elo points that need to be shifted from the away team 
         to the home team based on the game result. Positive indicates points 
         go to the home team, negative indicates points go to the away team.
