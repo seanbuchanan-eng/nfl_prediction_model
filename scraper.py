@@ -144,5 +144,6 @@ if __name__ == '__main__':
     # with open('test_page.html', 'wb') as f:
     #     f.write(page.content)
     # soup = BeautifulSoup(page.content, "html.parser")
-    # games = get_week_games(1, 2023, 'test_page.html')
-    # print(games)
+    soup = get_local_soup("test_page.html")
+    games = get_week_games(6, 2023, 'test_page.html')
+    print(games)
