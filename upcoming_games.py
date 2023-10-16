@@ -20,7 +20,7 @@ def calc_last_game_date(games):
     Date object    
         Date of last game in games as a date object.
     """
-    last_game_date = games[-2]['game_date'].split('-')
+    last_game_date = games[-1]['game_date'].split('-')
     last_game_date = date(int(last_game_date[0]), 
                             int(last_game_date[1]), 
                             int(last_game_date[2]))
